@@ -1,32 +1,24 @@
-// Importa SOLO los módulos de Firestore que necesita este script
-// Los módulos de Firebase app y auth ya están inicializados en index.html
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Accede a las instancias globales de Firebase que se inicializaron en index.html
-// Es crucial que window.firebaseApp, window.db, window.auth, window.currentUserId y window.appId
-// estén disponibles globalmente y sean verificados.
-const db = window.db; // Reasignar para un uso más conciso
-let currentUserId = window.currentUserId; // Se actualizará al estar listo Firebase Auth
-let isAuthReady = window.isAuthReady; // Bandera del estado de autenticación de Firebase
-const appId = window.appId; // ID de la aplicación para estructurar Firestore
+const db = window.db;
+let currentUserId = window.currentUserId;
+let isAuthReady = window.isAuthReady;
+const appId = window.appId;
 
 // --- IMPORTANTE: CONFIGURACIÓN DE SEGURIDAD EN FIRESTORE ---
 // Recuerda que tu API Key está expuesta en el cliente.
 // Asegúrate de que tus reglas de seguridad de Firestore (en la consola de Firebase)
 // sean EXTREMADAMENTE estrictas para prevenir accesos no autorizados a tus datos.
-// Ejemplo de reglas básicas:
+// Las reglas correctas son:
 /*
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Reglas para la colección 'artifacts'
-    match /artifacts/{appId} {
-      // Colección de usuarios dentro de una app específica
-      match /users/{userId}/{documents=**} {
-        // Permitir lectura y escritura solo si el usuario está autenticado
-        // y el userId en la ruta coincide con su UID autenticado.
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    match /artifacts/{appId}/users/{userId}/dailySales/{saleId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
@@ -35,13 +27,13 @@ service cloud.firestore {
 
 
 // In-memory data storage for the POS system
-let menuItems = []; // All available products (drinks and toppings)
-let availableToppings = []; // Separate array for toppings
-let currentTransaction = []; // Items currently in the transaction
-let dailySales = []; // Completed sales for the day (now synced with Firestore)
-let editingSaleDocId = null; // Stores the Firestore document ID of the sale being edited
+let menuItems = [];
+let availableToppings = [];
+let currentTransaction = [];
+let dailySales = [];
+let editingSaleDocId = null;
 
-let currentDrinkBeingCustomized = null; // Stores the drink object while toppings are being selected
+let currentDrinkBeingCustomized = null;
 
 // DOM Elements
 const menuGrid = document.getElementById('menuGrid');
@@ -83,7 +75,7 @@ const endDateInput = document.getElementById('endDateInput');
 const applyFilterButton = document.getElementById('applyFilterButton');
 const clearFilterButton = document.getElementById('clearFilterButton');
 
-let isFilterEnabled = false; // Controls if the date filter is active
+let isFilterEnabled = false;
 
 // Report Elements
 const dailyReportButton = document.getElementById('dailyReportButton');
@@ -93,7 +85,6 @@ const reportContent = document.getElementById('reportContent');
 
 // --- Funciones de Utilidad para Accesibilidad ---
 
-// Función para manejar el foco dentro de los modales (focus trap)
 function trapFocus(element) {
     const focusableEls = element.querySelectorAll(
         'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
@@ -101,10 +92,9 @@ function trapFocus(element) {
     const firstFocusableEl = focusableEls[0];
     const lastFocusableEl = focusableEls[focusableEls.length - 1];
 
-    if (!firstFocusableEl) return; // No focusable elements in modal
+    if (!firstFocusableEl) return;
 
-    // Al abrir el modal, establecer el foco en el primer elemento enfocable
-    setTimeout(() => { // Pequeño retraso para asegurar que el modal es visible
+    setTimeout(() => {
         firstFocusableEl.focus();
     }, 100);
 
@@ -115,26 +105,24 @@ function trapFocus(element) {
             return;
         }
 
-        if (e.shiftKey) { // si Shift + Tab
+        if (e.shiftKey) {
             if (document.activeElement === firstFocusableEl) {
-                lastFocusableEl.focus(); // Loop al último elemento
+                lastFocusableEl.focus();
                 e.preventDefault();
             }
-        } else { // si solo Tab
+        } else {
             if (document.activeElement === lastFocusableEl) {
-                firstFocusableEl.focus(); // Loop al primer elemento
+                firstFocusableEl.focus();
                 e.preventDefault();
             }
         }
     });
 }
 
-// Variable para rastrear el elemento que abrió el modal para restaurar el foco
 let lastFocusedElement = null;
 
-// Modales mejorados para accesibilidad
 function showMessage(title, message) {
-    lastFocusedElement = document.activeElement; // Guardar el elemento enfocado
+    lastFocusedElement = document.activeElement;
     modalTitle.textContent = title;
     modalMessage.textContent = message;
     messageModalOverlay.classList.add('show');
@@ -144,7 +132,7 @@ function showMessage(title, message) {
 function hideMessage() {
     messageModalOverlay.classList.remove('show');
     if (lastFocusedElement) {
-        lastFocusedElement.focus(); // Restaurar el foco
+        lastFocusedElement.focus();
         lastFocusedElement = null;
     }
 }
@@ -152,7 +140,7 @@ function hideMessage() {
 let onConfirmCallback = null;
 
 function showConfirm(title, message, callback) {
-    lastFocusedElement = document.activeElement; // Guardar el elemento enfocado
+    lastFocusedElement = document.activeElement;
     confirmTitle.textContent = title;
     confirmMessage.textContent = message;
     onConfirmCallback = callback;
@@ -164,7 +152,7 @@ function hideConfirm() {
     confirmModalOverlay.classList.remove('show');
     onConfirmCallback = null;
     if (lastFocusedElement) {
-        lastFocusedElement.focus(); // Restaurar el foco
+        lastFocusedElement.focus();
         lastFocusedElement = null;
     }
 }
@@ -181,9 +169,7 @@ function cancelToppingSelection() {
 
 // --- Data Initialization ---
 function initializeData() {
-    // Define menu items (only drinks here)
     menuItems = [
-        // Frappés base agua
         { id: 'water-litchi', name: 'Frappé Litchi (Agua)', price: 75, type: 'drink' },
         { id: 'water-fresa', name: 'Frappé Fresa (Agua)', price: 75, type: 'drink' },
         { id: 'water-blueberry', name: 'Frappé Blueberry (Agua)', price: 75, type: 'drink' },
@@ -192,7 +178,6 @@ function initializeData() {
         { id: 'water-maracuya', name: 'Frappé Maracuyá (Agua)', price: 75, type: 'drink' },
         { id: 'water-guanabana', name: 'Frappé Guanábana (Agua)', price: 75, type: 'drink' },
         { id: 'water-sandia', name: 'Frappé Sandía (Agua)', price: 75, type: 'drink' },
-        // Frappés base leche
         { id: 'milk-choco-mexicano', name: 'Frappé Chocolate Mexicano (Leche)', price: 75, type: 'drink' },
         { id: 'milk-taro', name: 'Frappé Taro (Leche)', price: 75, type: 'drink' },
         { id: 'milk-mazapan', name: 'Frappé Mazapán (Leche)', price: 75, type: 'drink' },
@@ -201,7 +186,6 @@ function initializeData() {
         { id: 'milk-cookies-cream', name: 'Frappé Cookies & Cream (Leche)', price: 75, type: 'drink' },
         { id: 'milk-crema-irlandesa', name: 'Frappé Crema Irlandesa (Leche)', price: 75, type: 'drink' },
         { id: 'milk-matcha', name: 'Frappé Matcha (Leche)', price: 75, type: 'drink' },
-        // Bebidas Calientes
         { id: 'hot-chocolate', name: 'Chocolate Caliente', price: 60, type: 'drink' },
         { id: 'hot-taro', name: 'Taro Caliente', price: 60, type: 'drink' },
         { id: 'hot-mazapan', name: 'Mazapán Caliente', price: 60, type: 'drink' },
@@ -210,11 +194,9 @@ function initializeData() {
         { id: 'hot-cookies-cream', name: 'Cookies & Cream Caliente', price: 60, type: 'drink' },
         { id: 'hot-crema-irlandesa', name: 'Crema Irlandesa Caliente', price: 60, type: 'drink' },
         { id: 'hot-matcha', name: 'Matcha Caliente', price: 60, type: 'drink' },
-        // Promociones (tratadas como bebidas por ahora)
         { id: 'promo-fresas-crema', name: 'Frappé Fresas con Crema (Temporada)', price: 75, type: 'drink' },
     ];
 
-    // Define available toppings separately
     availableToppings = [
         { id: 'topping-frutos-rojos', name: 'Perlas explosivas de frutos rojos', price: 10 },
         { id: 'topping-manzana-verde', name: 'Perlas explosivas de manzana verde', price: 10 },
@@ -225,26 +207,24 @@ function initializeData() {
 
 // --- UI Rendering Functions ---
 
-// Renders all menu items (drinks) in the menu grid
 function renderMenu() {
-    menuGrid.innerHTML = ''; // Clear existing items
+    menuGrid.innerHTML = '';
     menuItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = `menu-item ${item.type}`; // Add type class for specific styling
+        itemDiv.className = `menu-item ${item.type}`;
         itemDiv.dataset.itemId = item.id;
-        itemDiv.tabIndex = 0; // Hacer que sea enfocable para accesibilidad
-        itemDiv.setAttribute('role', 'button'); // Indicar que es un botón
-        itemDiv.setAttribute('aria-label', `Seleccionar ${item.name} por $${item.price.toFixed(2)}`); // Descripción para lectores de pantalla
+        itemDiv.tabIndex = 0;
+        itemDiv.setAttribute('role', 'button');
+        itemDiv.setAttribute('aria-label', `Seleccionar ${item.name} por $${item.price.toFixed(2)}`);
 
         itemDiv.innerHTML = `
             <span class="item-name">${item.name}</span>
             <span class="item-price">$${item.price.toFixed(2)}</span>
         `;
-        // Cuando un elemento del menú es clickeado o se presiona Enter/Espacio
         itemDiv.addEventListener('click', () => openToppingSelectionModal(item));
         itemDiv.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault(); // Prevenir el scroll de la página con Espacio
+                e.preventDefault();
                 openToppingSelectionModal(item);
             }
         });
@@ -252,9 +232,8 @@ function renderMenu() {
     });
 }
 
-// Updates the transaction list and total display
 function updateTransactionDisplay() {
-    transactionList.innerHTML = ''; // Clear existing items
+    transactionList.innerHTML = '';
     let total = 0;
 
     if (currentTransaction.length === 0) {
@@ -289,7 +268,6 @@ function updateTransactionDisplay() {
 
     transactionTotalElement.textContent = `Total: $${total.toFixed(2)}`;
 
-    // Update button text based on editing mode
     if (editingSaleDocId) {
         completeSaleButton.textContent = 'Actualizar Venta ✅';
         clearTransactionButton.textContent = 'Cancelar Edición ❌';
@@ -298,7 +276,6 @@ function updateTransactionDisplay() {
         clearTransactionButton.textContent = 'Vaciar Transacción 🗑️';
     }
 
-    // Add event listeners for remove buttons
     transactionList.querySelectorAll('.remove-item-btn').forEach(button => {
         button.addEventListener('click', (event) => {
             const transactionLineIdToRemove = event.target.dataset.transactionLineId;
@@ -307,7 +284,6 @@ function updateTransactionDisplay() {
     });
 }
 
-// Renders the list of completed daily sales from the `dailySales` array or a filtered array
 function renderDailySales(salesToRender = dailySales) {
     dailySalesList.innerHTML = '';
     if (salesToRender.length === 0) {
@@ -386,7 +362,7 @@ function updateToppingModalTotalPriceDisplay() {
 }
 
 function openToppingSelectionModal(drinkItem) {
-    lastFocusedElement = document.activeElement; // Guardar el elemento que abrió el modal
+    lastFocusedElement = document.activeElement;
 
     currentDrinkBeingCustomized = {
         ...drinkItem,
@@ -404,8 +380,8 @@ function openToppingSelectionModal(drinkItem) {
         toppingItemDiv.dataset.toppingId = topping.id;
         toppingItemDiv.dataset.toppingName = topping.name;
         toppingItemDiv.dataset.toppingPrice = topping.price;
-        toppingItemDiv.tabIndex = 0; // Hacer enfocable
-        toppingItemDiv.setAttribute('role', 'option'); // Rol para accesibilidad
+        toppingItemDiv.tabIndex = 0;
+        toppingItemDiv.setAttribute('role', 'option');
 
         toppingItemDiv.innerHTML = `
             <span class="topping-modal-name">${topping.name}</span>
@@ -492,8 +468,7 @@ function addCustomizedDrinkToTransaction() {
 
         currentDrinkBeingCustomized = null;
         toppingSelectionOverlay.classList.remove('show');
-        if (lastFocusedElement) lastFocusedElement.focus(); // Restaurar foco
-        updateTransactionDisplay();
+        if (lastFocusedElement) lastFocusedElement.focus();
         showMessage('Producto Añadido', `Se añadieron ${quantity}x ${currentDrinkBeingCustomized.name} a la transacción.`);
     }
 }
@@ -520,10 +495,17 @@ async function completeSale() {
         return;
     }
 
-    // Asegurarse de que Firebase esté listo y haya un User ID
-    if (!isAuthReady || !db || !currentUserId) {
-        console.error("Firebase: DB o User ID no están listos.", { isAuthReady, db, currentUserId });
-        showMessage('Error de Autenticación', 'Firebase no está listo o el ID de usuario no está disponible. Por favor, espera un momento o recarga la página.');
+    // Asegurarse de que Firebase esté listo y haya un User ID VÁLIDO
+    if (!window.isAuthReady || !window.db || !window.currentUserId) {
+        console.error("Firebase: DB o User ID no están listos o la autenticación falló.", { isAuthReady: window.isAuthReady, db: window.db, currentUserId: window.currentUserId });
+        
+        let errorMessage = 'Firebase no está listo o el ID de usuario no está disponible.';
+        if (!window.isAuthReady) {
+            errorMessage = 'La inicialización de Firebase no ha finalizado. Por favor, espera un momento o recarga la página.';
+        } else if (!window.currentUserId) {
+            errorMessage = 'No se pudo autenticar al usuario. La persistencia de datos no funcionará. Por favor, recarga la página o verifica tu conexión.';
+        }
+        showMessage('Error de Autenticación', errorMessage);
         return;
     }
 
@@ -535,12 +517,8 @@ async function completeSale() {
         total: total
     };
 
-    // Opcional: Mostrar un indicador de carga mientras se guarda la venta
-    // const loadingIndicator = document.getElementById('loadingIndicator');
-    // if (loadingIndicator) loadingIndicator.style.display = 'block';
-
     try {
-        const salesCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/dailySales`);
+        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`);
 
         if (editingSaleDocId) {
             const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
@@ -558,9 +536,12 @@ async function completeSale() {
         updateTransactionDisplay();
     } catch (error) {
         console.error("Error al guardar documento en Firestore: ", error);
-        showMessage('Error al Guardar Venta', `Hubo un problema al guardar la venta: ${error.message}. Por favor, revisa la consola para más detalles y tus reglas de seguridad de Firestore.`);
-    } finally {
-        // if (loadingIndicator) loadingIndicator.style.display = 'none'; // Ocultar indicador de carga
+        // Mensaje de error más específico si es un 'permission-denied'
+        if (error.code === 'permission-denied') {
+            showMessage('Error de Permisos', 'No tienes permisos para realizar esta operación. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
+        } else {
+            showMessage('Error al Guardar Venta', `Hubo un problema al guardar la venta: ${error.message}.`);
+        }
     }
 }
 
@@ -578,22 +559,26 @@ function clearTransaction() {
     });
 }
 
-// --- Funciones para Edición/Eliminación de Ventas ---
+// --- Functions for Editing/Deleting Sales ---
 
 async function deleteSale(saleId) {
-    if (!isAuthReady || !db || !currentUserId) {
+    if (!window.isAuthReady || !window.db || !window.currentUserId) {
         showMessage('Error de Autenticación', 'Firebase no está listo o el ID de usuario no está disponible.');
         return;
     }
 
     try {
-        const saleDocRef = doc(db, `artifacts/${appId}/users/${currentUserId}/dailySales`, saleId);
+        const saleDocRef = doc(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Documento eliminado exitosamente con ID: ", saleId);
         showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
     } catch (error) {
         console.error("Error al eliminar documento: ", error);
-        showMessage('Error al Eliminar Venta', `Hubo un problema al eliminar la venta: ${error.message}.`);
+        if (error.code === 'permission-denied') {
+            showMessage('Error de Permisos', 'No tienes permisos para eliminar esta venta. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
+        } else {
+            showMessage('Error al Eliminar Venta', `Hubo un problema al eliminar la venta: ${error.message}.`);
+        }
     }
 }
 
@@ -609,7 +594,7 @@ function editSale(saleId) {
     }
 }
 
-// --- Funciones para Filtrado de Ventas ---
+// --- Functions for Filtering Sales ---
 function applySalesFilter() {
     if (!isFilterEnabled) {
         renderDailySales(dailySales);
@@ -681,7 +666,7 @@ function sendWhatsAppConfirmation() {
     message += `\n\nTu pago será en efectivo? Te llevo cambio? O si prefieres por transferencia a la siguiente CLABE 722968010305501833`;
     message += `\n\n¡Gracias por tu compra! 💖`;
 
-    const whatsappNumber = "5217712794633"; // Número de WhatsApp de Capibobba
+    const whatsappNumber = "5217712794633";
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
@@ -698,7 +683,6 @@ function sendWhatsAppConfirmation() {
 
 // --- Funciones de Reportes ---
 
-// Helper to format date as YYYY-MM-DD
 function formatDate(date) {
     const d = new Date(date);
     const year = d.getFullYear();
@@ -707,11 +691,10 @@ function formatDate(date) {
     return `${year}-${month}-${day}`;
 }
 
-// Helper to get the Monday of the week for a given date
 function getMondayOfWeek(date) {
     const d = new Date(date);
-    const day = d.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust if Sunday
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
     monday.setHours(0, 0, 0, 0);
     return monday;
@@ -863,7 +846,6 @@ drinkQuantityInput.addEventListener('change', () => {
 applyFilterButton.addEventListener('click', applySalesFilter);
 clearFilterButton.addEventListener('click', clearSalesFilter);
 
-// Toggle Filter Checkbox Event Listener (mejorado con aria-checked)
 toggleFilterCheckbox.addEventListener('change', () => {
     isFilterEnabled = toggleFilterCheckbox.checked;
     const switchLabel = toggleFilterCheckbox.closest('.switch');
@@ -920,11 +902,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, (error) => {
                 console.error("Firestore: Error al obtener ventas diarias:", error);
-                showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
+                if (error.code === 'permission-denied') {
+                    showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
+                } else {
+                    showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
+                }
             });
         } else {
             console.warn("POS Script: Firebase o ID de usuario no listos, no se puede configurar el listener de Firestore. Mostrando solo datos locales.");
             renderDailySales();
+            // Mostrar un mensaje al usuario si la autenticación falló al inicio
+            if (!isAuthReady || !currentUserId) {
+                showMessage('Problema de Autenticación', 'No se pudo establecer la conexión con la base de datos. Las ventas no se guardarán. Por favor, recarga la página.');
+            }
         }
     });
 });
