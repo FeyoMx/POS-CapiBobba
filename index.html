@@ -1,56 +1,242 @@
-<script type="module" defer>
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto de Venta Capibobba</title>
+    <!-- Nueva meta descripción para SEO -->
+    <meta name="description" content="Sistema de punto de venta para Capibobba: gestiona ventas, menú y reportes de forma eficiente y rápida.">
 
-    window.firebaseApp = null;
-    window.db = null;
-    window.auth = null;
-    window.currentUserId = null;
-    window.isAuthReady = false;
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF69B4"> <!-- Color principal de tu aplicación -->
+    <!-- Meta tags actualizadas para iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Capibobba POS">
+    <!-- Usar una imagen propia para producción, no un placeholder. Asegúrate de que exista en tu proyecto. -->
+    <link rel="apple-touch-icon" href="/images/capibobba-icon-192x192.png"> 
+    <meta name="mobile-web-app-capable" content="yes">
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyAmp_Ymyc9j06jLK2WV_F8Ow5b8UBc2O0U", 
-        authDomain: "pos-capibobba.firebaseapp.com",
-        projectId: "pos-capibobba",
-        storageBucket: "pos-capibobba.firebasestorage.app",
-        messagingSenderId: "1016686030608",
-        appId: "1:1016686030608:web:7b28ce00d347ce32403f95",
-        measurementId: "G-GZY0B5FBQZ",
-    };
+    <!-- Carga de Fuentes de Google Fonts optimizada (más temprana que @import) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
-    window.appId = firebaseConfig.projectId || 'capibobba-pos-app'; 
+    <!-- Enlace al archivo CSS externo para una mejor mantenibilidad y cacheo -->
+    <link rel="stylesheet" href="style.css">
 
-    if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-        window.firebaseApp = initializeApp(firebaseConfig);
-        window.auth = getAuth(window.firebaseApp);
-        window.db = getFirestore(window.firebaseApp);
+    <!-- Firebase SDKs - Inicialización temprana para el listener de autenticación -->
+    <script type="module" defer>
+        // Importa solo los módulos necesarios para la inicialización y autenticación
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        onAuthStateChanged(window.auth, async (user) => {
-            if (user) {
-                window.currentUserId = user.uid;
-                window.isAuthReady = true;
-                console.log("Firebase: Usuario autenticado. UID:", user.uid);
-            } else {
-                console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima...");
-                try {
-                    const userCredential = await signInAnonymously(window.auth);
-                    window.currentUserId = userCredential.user.uid;
-                    window.isAuthReady = true;
-                    console.log("Firebase: Sesión anónima iniciada. UID:", window.currentUserId);
-                } catch (error) {
-                    console.error("Firebase: Error durante la autenticación anónima:", error);
-                    window.currentUserId = null;
-                    window.isAuthReady = false;
+        // Hacer las instancias de Firebase disponibles globalmente
+        // Esto permite que el script principal (script.js) las use una vez que estén listas.
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+        window.currentUserId = null; // Para almacenar el ID del usuario autenticado
+        window.isAuthReady = false; // Bandera para asegurar que las operaciones de Firestore esperen la autenticación
+
+        // --- REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE REAL ---
+        // Puedes obtener esta configuración desde la consola de Firebase.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAmp_Ymyc9j06jLK2WV_F8Ow5b8UBc2O0U", // Asegúrate de que tus reglas de seguridad de Firestore sean MUY ESTRICTAS.
+            authDomain: "pos-capibobba.firebaseapp.com",
+            projectId: "pos-capibobba",
+            storageBucket: "pos-capibobba.firebasestorage.app",
+            messagingSenderId: "1016686030608",
+            appId: "1:1016686030608:web:7b28ce00d347ce32403f95",
+            measurementId: "G-GZY0B5FBQZ",
+        };
+        // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
+
+        // Usar projectId como appId para la colección de artefactos si no se define uno específico
+        window.appId = firebaseConfig.projectId || 'capibobba-pos-app'; 
+
+        if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Verifica que la configuración sea válida
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.auth = getAuth(window.firebaseApp);
+            window.db = getFirestore(window.firebaseApp);
+
+            // Escuchar cambios en el estado de autenticación
+            onAuthStateChanged(window.auth, async (user) => {
+                if (user) {
+                    // El usuario está autenticado (ya sea existente o anónimo recién logueado)
+                    window.currentUserId = user.uid; // Asigna el UID del usuario autenticado
+                    window.isAuthReady = true; // La autenticación está lista
+                    console.log("Firebase: Usuario autenticado. UID:", user.uid);
+                } else {
+                    // No hay usuario autenticado, intenta la autenticación anónima
+                    console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima...");
+                    try {
+                        const userCredential = await signInAnonymously(window.auth);
+                        // Después de un signInAnonymously exitoso, onAuthStateChanged se disparará de nuevo
+                        // con el nuevo usuario anónimo, y la rama 'if (user)' de arriba lo manejará.
+                        window.currentUserId = userCredential.user.uid; // Aseguramos que se asigne aquí también
+                        window.isAuthReady = true; // La autenticación anónima fue exitosa
+                        console.log("Firebase: Sesión anónima iniciada. UID:", window.currentUserId);
+                    } catch (error) {
+                        console.error("Firebase: Error durante la autenticación anónima:", error);
+                        window.currentUserId = null; // Si la autenticación falla, no hay UID válido
+                        window.isAuthReady = false; // La autenticación NO está lista
+                        // Informar al script principal que la autenticación no fue exitosa
+                    }
                 }
-            }
-            // CORRECCIÓN: Eliminado el 'new' duplicado
+                // Siempre despachar el evento para que script.js sepa que el estado de auth ha sido evaluado
+                document.dispatchEvent(new Event('firebaseAuthReady'));
+            });
+        } else {
+            console.error("Firebase: firebaseConfig no está completo o es inválido. La persistencia no funcionará.");
+            window.isAuthReady = false; // No puede estar listo si la configuración es mala
+            window.currentUserId = null; // No hay un ID de usuario válido
             document.dispatchEvent(new Event('firebaseAuthReady'));
-        });
-    } else {
-        console.error("Firebase: firebaseConfig no está completo o es inválido. La persistencia no funcionará.");
-        window.isAuthReady = false;
-        window.currentUserId = null;
-        document.dispatchEvent(new Event('firebaseAuthReady'));
-    }
-</script>
+        }
+    </script>
+</head>
+<body>
+    <h1>Punto de Venta Capibobba 🧋✨</h1>
+
+    <!-- Uso de <main> para el contenido principal de la página (accesibilidad y semántica) -->
+    <main class="container"> 
+        <!-- Sección de Menú de Productos -->
+        <section class="section menu-section">
+            <h2 class="section-title">Menú de Productos 📋</h2>
+            <div class="menu-grid" id="menuGrid" role="group" aria-label="Menú de Bebidas y Productos">
+                <!-- Los productos se cargarán aquí dinámicamente con JavaScript -->
+            </div>
+        </section>
+
+        <!-- Sección de Transacción Actual -->
+        <section class="section transaction-section">
+            <h2 class="section-title">Transacción Actual 🛒</h2>
+            <ul class="transaction-list" id="transactionList" role="list">
+                <!-- Los ítems de la transacción se cargarán aquí dinámicamente -->
+                <li role="listitem" style="text-align: center; color: var(--text-gray);">¡Añade productos para empezar!</li>
+            </ul>
+            <div class="transaction-total" id="transactionTotal" aria-live="polite">Total: $0.00</div>
+            <div class="transaction-actions" role="group" aria-label="Acciones de Transacción">
+                <!-- Etiquetas aria-label para accesibilidad en botones con iconos/emojis -->
+                <button class="action-button whatsapp" id="whatsappConfirmationButton" aria-label="Enviar confirmación de pedido por WhatsApp">Confirmación de pedido 📱</button>
+                <button class="action-button" id="completeSaleButton" aria-label="Completar y pagar venta">Pagar ✅</button>
+                <button class="action-button clear" id="clearTransactionButton" aria-label="Vaciar transacción actual">Vaciar Transacción 🗑️</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Sección de Registro de Ventas Diarias -->
+    <section class="daily-sales-section">
+        <h2 class="section-title">Registro de Ventas Diarias 📈</h2>
+        
+        <!-- Controles de filtro con mejoras de accesibilidad -->
+        <div class="filter-toggle-container">
+            <label for="toggleFilterCheckbox">Activar Filtro de Fechas:</label>
+            <!-- Rol "switch" para mejor accesibilidad de toggles -->
+            <label class="switch" role="switch" aria-checked="false" tabindex="0"> 
+                <input type="checkbox" id="toggleFilterCheckbox">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="sales-filter-controls hidden" id="salesFilterControlsContainer" role="group" aria-label="Controles de Filtro de Ventas">
+            <label for="startDateInput">Desde:</label>
+            <input type="date" id="startDateInput" aria-label="Fecha de inicio del filtro">
+            <label for="endDateInput">Hasta:</label>
+            <input type="date" id="endDateInput" aria-label="Fecha de fin del filtro">
+            <button class="filter" id="applyFilterButton">Filtrar</button>
+            <button class="clear-filter" id="clearFilterButton">Limpiar Filtro</button>
+        </div>
+
+        <ul class="sales-list" id="dailySalesList" role="list">
+            <li role="listitem" style="text-align: center; color: var(--text-gray);">No hay ventas registradas hoy.</li>
+        </ul>
+    </section>
+
+    <!-- Sección de Informes de Ventas -->
+    <section class="sales-reports-section">
+        <h2 class="section-title">Informes de Ventas 📊</h2>
+        <div class="report-buttons" role="group" aria-label="Botones para generar Informes de Ventas">
+            <button id="dailyReportButton">Informe Diario</button>
+            <button id="weeklyReportButton">Informe Semanal</button>
+            <button id="monthlyReportButton">Informe Mensual</button>
+        </div>
+        <div class="report-content" id="reportContent" aria-live="polite">
+            <p style="text-align: center; color: var(--text-gray);">Selecciona un tipo de informe para ver los resultados.</p>
+        </div>
+    </section>
+
+
+    <!-- Modal para mensajes (con roles ARIA para accesibilidad) -->
+    <div id="messageModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalMessage">
+        <div class="modal-content">
+            <h3 id="modalTitle"></h3>
+            <p id="modalMessage"></p>
+            <button id="modalCloseButton" aria-label="Cerrar mensaje">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal (con roles ARIA para accesibilidad) -->
+    <div id="confirmModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+        <div class="modal-content">
+            <h3 id="confirmTitle"></h3>
+            <p id="confirmMessage"></p>
+            <button id="confirmYesButton">Sí</button>
+            <button id="confirmNoButton">No</button>
+        </div>
+    </div>
+
+    <!-- Topping Selection Modal (con roles ARIA para accesibilidad) -->
+    <div id="toppingSelectionOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="toppingDrinkNameHeading" aria-describedby="toppingModalDescription">
+        <div class="topping-selection-content">
+            <div class="section-header">
+                <!-- Cambiado a h3 para mantener jerarquía correcta dentro del modal -->
+                <h3 class="section-title" id="toppingDrinkNameHeading">¡Personaliza tu <span id="toppingDrinkName" class="current-drink-name-modal"></span>!</h3>
+                <p id="toppingModalDescription">Selecciona los toppings que deseas añadir a esta bebida:</p>
+            </div>
+            <div id="toppingsModalGrid" class="toppings-modal-grid" role="group" aria-label="Opciones de Toppings disponibles">
+                <!-- Toppings will be dynamically loaded here by JS -->
+            </div>
+
+            <!-- Quantity input for the drink con control de accesibilidad -->
+            <div class="quantity-control" role="group" aria-label="Control de Cantidad de Bebida">
+                <label for="drinkQuantity">Cantidad:</label>
+                <button id="decrementQuantity" aria-label="Disminuir cantidad">-</button>
+                <input type="number" id="drinkQuantity" value="1" min="1" aria-live="polite" aria-label="Cantidad de bebida seleccionada">
+                <button id="incrementQuantity" aria-label="Aumentar cantidad">+</button>
+            </div>
+
+            <div class="topping-modal-total" aria-live="polite">
+                Total: $<span id="toppingModalTotalPrice">0.00</span>
+            </div>
+
+            <div class="topping-selection-actions" role="group" aria-label="Acciones de Selección de Toppings">
+                <button id="confirmToppingsButton">Confirmar Selección ✅</button>
+                <button id="noToppingsButton">Sin Toppings 🚫</button>
+                <button id="cancelToppingsButton">Cancelar ❌</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlace al archivo JavaScript principal, con defer para no bloquear el renderizado -->
+    <script type="module" src="script.js" defer></script>
+
+    <!-- Service Worker Registration (Código PWA existente) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrado con éxito:', registration);
+                    })
+                    .catch(error => {
+                        console.error('Fallo el registro del Service Worker:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
+
