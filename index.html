@@ -6,27 +6,30 @@
     <title>Punto de Venta Capibobba</title>
     <meta name="description" content="Sistema de punto de venta para Capibobba: gestiona ventas, menú y reportes de forma eficiente y rápida.">
 
+    <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#FF69B4"> <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#FF69B4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Capibobba POS">
     <link rel="apple-touch-icon" href="/images/capibobba-icon-192x192.png"> 
     <meta name="mobile-web-app-capable" content="yes">
 
+    <!-- Carga de Fuentes de Google Fonts optimizada -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
+    <!-- Enlace al archivo CSS externo -->
     <link rel="stylesheet" href="style.css">
 
+    <!-- Firebase SDKs - Inicialización temprana para el listener de autenticación -->
     <script type="module" defer>
-        // Importa solo los módulos necesarios para la inicialización y autenticación
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Hacer las instancias de Firebase disponibles globalmente
-        // Esto permite que el script principal (script.js) las use una vez que estén listas.
         window.firebaseApp = null;
         window.db = null;
         window.auth = null;
@@ -35,7 +38,7 @@
 
         // --- REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE REAL ---
         const firebaseConfig = {
-            apiKey: "AIzaSyAmp_Ymyc9j06jLK2WV_F8Ow5b8UBc2O0U", // Asegúrate de que tus reglas de seguridad de Firestore sean MUY ESTRICTAS.
+            apiKey: "AIzaSyAmp_Ymyc9j06jLK2WV_F8Ow5b8UBc2O0U", 
             authDomain: "pos-capibobba.firebaseapp.com",
             projectId: "pos-capibobba",
             storageBucket: "pos-capibobba.firebasestorage.app",
@@ -45,40 +48,45 @@
         };
         // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
 
-        // Usar projectId como appId para la colección de artefactos si no se define uno específico
         window.appId = firebaseConfig.projectId || 'capibobba-pos-app'; 
 
-        if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Verifica que la configuración sea válida
+        if (firebaseConfig.apiKey && firebaseConfig.projectId) {
             window.firebaseApp = initializeApp(firebaseConfig);
             window.auth = getAuth(window.firebaseApp);
             window.db = getFirestore(window.firebaseApp);
 
-            // Escuchar cambios en el estado de autenticación
+            // Este listener es CRÍTICO para gestionar el estado de autenticación.
+            // Se llamará cuando el estado de auth cambie (inicio de sesión, cierre de sesión, etc.)
             onAuthStateChanged(window.auth, async (user) => {
                 if (user) {
-                    window.currentUserId = user.uid;
+                    // El usuario está autenticado (ya sea existente o anónimo recién logueado)
+                    window.currentUserId = user.uid; // Asigna el UID del usuario autenticado
+                    window.isAuthReady = true; // La autenticación está lista
                     console.log("Firebase: Usuario autenticado. UID:", user.uid);
                 } else {
-                    // Autenticación anónima si no hay usuario logueado (ej. primera carga)
+                    // No hay usuario autenticado, intenta la autenticación anónima
+                    console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima...");
                     try {
-                        await signInAnonymously(window.auth);
-                        window.currentUserId = window.auth.currentUser.uid;
+                        const userCredential = await signInAnonymously(window.auth);
+                        // Después de un signInAnonymously exitoso, onAuthStateChanged se disparará de nuevo
+                        // con el nuevo usuario anónimo, y la rama 'if (user)' de arriba lo manejará.
+                        window.currentUserId = userCredential.user.uid; // Aseguramos que se asigne aquí también
+                        window.isAuthReady = true; // La autenticación anónima fue exitosa
                         console.log("Firebase: Sesión anónima iniciada. UID:", window.currentUserId);
                     } catch (error) {
                         console.error("Firebase: Error durante la autenticación anónima:", error);
-                        // Fallback a un ID aleatorio si la autenticación falla, pero ten en cuenta las reglas de seguridad
-                        window.currentUserId = crypto.randomUUID(); 
-                        console.warn("Firebase: Usando UUID aleatorio como userId debido a fallo de autenticación.");
+                        window.currentUserId = null; // Si la autenticación falla, no hay UID válido
+                        window.isAuthReady = false; // La autenticación NO está lista
+                        // Informar al script principal que la autenticación no fue exitosa
                     }
                 }
-                window.isAuthReady = true;
-                // Una vez que la autenticación está lista, despachar un evento al script principal
-                document.dispatchEvent(new new Event('firebaseAuthReady'));
+                // Siempre despachar el evento para que script.js sepa que el estado de auth ha sido evaluado
+                document.dispatchEvent(new Event('firebaseAuthReady'));
             });
         } else {
             console.error("Firebase: firebaseConfig no está completo o es inválido. La persistencia no funcionará.");
-            window.isAuthReady = true;
-            window.currentUserId = crypto.randomUUID(); // Usar un ID aleatorio para operaciones locales
+            window.isAuthReady = false; // No puede estar listo si la configuración es mala
+            window.currentUserId = null; // No hay un ID de usuario válido
             document.dispatchEvent(new Event('firebaseAuthReady'));
         }
     </script>
@@ -90,7 +98,7 @@
         <section class="section menu-section">
             <h2 class="section-title">Menú de Productos 📋</h2>
             <div class="menu-grid" id="menuGrid" role="group" aria-label="Menú de Bebidas y Productos">
-                </div>
+            </div>
         </section>
 
         <section class="section transaction-section">
@@ -169,7 +177,7 @@
                 <p id="toppingModalDescription">Selecciona los toppings que deseas añadir a esta bebida:</p>
             </div>
             <div id="toppingsModalGrid" class="toppings-modal-grid" role="group" aria-label="Opciones de Toppings disponibles">
-                </div>
+            </div>
 
             <div class="quantity-control" role="group" aria-label="Control de Cantidad de Bebida">
                 <label for="drinkQuantity">Cantidad:</label>
@@ -192,6 +200,7 @@
 
     <script type="module" src="script.js" defer></script>
 
+    <!-- Service Worker Registration (Código PWA existente) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
