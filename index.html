@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Punto de Venta Capibobba</title>
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF69B4"> <!-- Color principal de tu aplicación -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Capibobba POS">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/FF69B4/ffffff?text=CBPOS"> <!-- Icono para iOS -->
+
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -1050,7 +1058,7 @@
         </div>
     </div>
 
-    <!-- Confirmation Modal (NEW) -->
+    <!-- Confirmation Modal -->
     <div id="confirmModalOverlay" class="modal-overlay">
         <div class="modal-content">
             <h3 id="confirmTitle"></h3>
@@ -1092,6 +1100,19 @@
     </div>
 
     <script type="module">
+        // Register Service Worker (NEW PWA CODE)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrado con éxito:', registration);
+                    })
+                    .catch(error => {
+                        console.error('Fallo el registro del Service Worker:', error);
+                    });
+            });
+        }
+
         // Import Firebase modules (already imported in the <script type="module"> block above)
         import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -1126,7 +1147,7 @@
         const modalMessage = document.getElementById('modalMessage');
         const modalCloseButton = document.getElementById('modalCloseButton');
 
-        // Confirmation Modal Elements (NEW)
+        // Confirmation Modal Elements
         const confirmModalOverlay = document.getElementById('confirmModalOverlay');
         const confirmTitle = document.getElementById('confirmTitle');
         const confirmMessage = document.getElementById('confirmMessage');
@@ -1143,7 +1164,7 @@
         const drinkQuantityInput = document.getElementById('drinkQuantity');
         const decrementQuantityButton = document.getElementById('decrementQuantity');
         const incrementQuantityButton = document.getElementById('incrementQuantity');
-        const toppingModalTotalPriceElement = document.getElementById('toppingModalTotalPrice'); // NEW
+        const toppingModalTotalPriceElement = document.getElementById('toppingModalTotalPrice');
 
         // Filter Elements
         const toggleFilterCheckbox = document.getElementById('toggleFilterCheckbox');
@@ -1849,7 +1870,7 @@
         whatsappConfirmationButton.addEventListener('click', sendWhatsAppConfirmation);
         modalCloseButton.addEventListener('click', hideMessage);
 
-        // Confirmation Modal Buttons (NEW)
+        // Confirmation Modal Buttons
         confirmYesButton.addEventListener('click', () => {
             if (onConfirmCallback) {
                 onConfirmCallback();
