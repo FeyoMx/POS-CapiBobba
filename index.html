@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto de Venta Capibobba</title>
+    <style>
+        /* Importa la fuente Nunito de Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+        /* Estilos generales */
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #FF69B4; /* Capibobba pink */
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 900;
+            width: 100%; /* Ensure heading takes full width */
+        }
+
+        .section {
+            background-color: #fdfdff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            flex: 1; /* Allow sections to grow */
+            min-width: 300px; /* Minimum width for sections */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-title {
+            color: #9370DB; /* Purple */
+            font-size: 1.8em;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 2px solid #DDA0DD; /* Lilac border */
+            padding-bottom: 10px;
+        }
+
+        /* Menu Section */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Responsive grid */
+            gap: 15px;
+            flex-grow: 1; /* Allow menu to take available space */
+        }
+
+        .menu-item {
+            background-color: #e0f7fa; /* Light cyan */
+            border: 2px solid #87CEEB; /* Light blue */
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            background-color: #cceeff; /* Lighter blue on hover */
+        }
+
+        .item-name {
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #4b0082; /* Indigo */
+            margin-bottom: 5px;
+        }
+
+        .item-price {
+            font-weight: 800;
+            color: #32CD32; /* Lime green */
+            font-size: 1.2em;
+        }
+
+        /* Transaction Section */
+        .transaction-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1; /* Allow list to take available space */
+            overflow-y: auto; /* Scroll for long lists */
+            max-height: 400px; /* Max height for scroll */
+            border: 1px dashed #B0C4DE;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-info {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .item-info span {
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .item-info .item-qty-name {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .item-info .item-toppings-display {
+            font-size: 0.8em;
+            color: #777;
+            font-style: italic;
+        }
+
+        .item-total-price {
+            font-weight: 800;
+            color: #FF1493; /* Deep pink */
+            font-size: 1.1em;
+            margin-right: 10px;
+            white-space: nowrap; /* Prevent wrapping */
+        }
+
+        .remove-item-btn {
+            background-color: #ff6347; /* Tomato */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 8px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background-color 0.2s ease;
+        }
+
+        .remove-item-btn:hover {
+            background-color: #ff4500; /* Orange red */
+        }
+
+        .transaction-total {
+            text-align: right;
+            font-size: 1.5em;
+            font-weight: 900;
+            color: #007BFF; /* Blue */
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 2px solid #B0C4DE;
+        }
+
+        .transaction-actions {
+            display: flex;
+            flex-direction: column; /* Stack buttons vertically */
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+            align-items: center; /* Center buttons horizontally */
+        }
+
+        .action-button {
+            background-color: #28a745; /* Green */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            width: 100%; /* Make buttons take full width */
+            max-width: 250px; /* Limit max width for larger screens */
+        }
+
+        .action-button.clear {
+            background-color: #dc3545; /* Red */
+        }
+
+        .action-button.whatsapp {
+            background-color: #25D366; /* WhatsApp Green */
+        }
+
+        .action-button:hover {
+            opacity: 0.9;
+        }
+
+        /* Daily Sales Section */
+        .daily-sales-section {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 1200px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+        }
+
+        .sales-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px dashed #B0C4DE;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .sale-item {
+            background-color: #f8f9fa; /* Light gray */
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .sale-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .sale-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .sale-details {
+            font-size: 0.9em;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+
+        .sale-details ul {
+            list-style: disc;
+            margin-left: 20px;
+            padding: 0;
+        }
+
+        .sale-details li {
+            margin-bottom: 3px;
+        }
+
+        .sale-total {
+            font-weight: 800;
+            color: #28a745; /* Green for total */
+            font-size: 1.1em;
+            text-align: right;
+            border-top: 1px dashed #ced4da;
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+
+        /* Modal for messages */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-content h3 {
+            color: #FF69B4;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .modal-content p {
+            margin-bottom: 25px;
+            color: #555;
+        }
+
+        .modal-content button {
+            background-color: #9370DB;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
+        .modal-content button:hover {
+            background-color: #87CEEB;
+        }
+
+        /* Topping Selection Modal Styles */
+        #toppingSelectionOverlay {
+            position: fixed; /* Fixed on screen */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6); /* Semi-transparent dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001; /* Higher than message modal */
+            opacity: 0; /* Initially hidden */
+            pointer-events: none; /* Not interactable when hidden */
+            transition: opacity 0.3s ease-in-out; /* Smooth transition for showing/hiding */
+        }
+
+        #toppingSelectionOverlay.show {
+            opacity: 1; /* Shows the overlay */
+            pointer-events: auto; /* Allows interaction when visible */
+        }
+
+        .topping-selection-content {
+            background: rgba(255, 255, 255, 0.95); /* Almost opaque white background */
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            border: 4px solid #FF69B4; /* Vibrant pink border */
+            max-width: 450px;
+            width: 80%; /* Fluid width */
+            transform: scale(0.9); /* Slightly smaller initially */
+            opacity: 0; /* Added for smooth content transition */
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; /* Transition for scaling and opacity */
+        }
+
+        #toppingSelectionOverlay.show .topping-selection-content {
+            transform: scale(1); /* Normal scale when showing */
+            opacity: 1; /* Transiciona a opacidad completa al mostrar */
+        }
+
+        .topping-selection-content .section-title {
+            color: #9370DB; /* Purple for topping modal title */
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .current-drink-name-modal {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #FF69B4; /* Pink for current drink name */
+            margin-bottom: 20px;
+        }
+
+        .toppings-modal-grid {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px dashed #DDA0DD;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .topping-modal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #F9F0FF; /* Very light purple */
+            border-radius: 12px;
+            padding: 12px 15px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+        }
+        .topping-modal-item.selected {
+            border: 2px solid #9370DB; /* Highlight selected toppings */
+            background: #E6E6FA; /* Slightly darker background */
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .topping-modal-name {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #9370DB;
+            flex-grow: 1;
+            text-align: left;
+        }
+
+        .topping-modal-price {
+            font-size: 1em;
+            font-weight: 600;
+            color: #32CD32;
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+
+        .add-topping-button {
+            background: linear-gradient(45deg, #00CED1, #87CEEB); /* Teal to light blue */
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 0.9em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .add-topping-button.remove {
+            background: linear-gradient(45deg, #FF6347, #FF4500); /* Orange-red */
+        }
+
+        .add-topping-button:hover {
+            transform: scale(1.03);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .topping-selection-actions {
+            margin-top: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .topping-selection-actions button {
+            font-size: 1em;
+            padding: 12px 20px;
+            border-radius: 18px;
+            border: 2px solid white;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .topping-selection-actions button:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #confirmToppingsButton {
+            background: linear-gradient(45deg, #25D366, #128C7E); /* Green for confirm */
+        }
+        #confirmToppingsButton:hover {
+            background: linear-gradient(45deg, #128C7E, #25D366);
+        }
+
+        #noToppingsButton {
+            background: linear-gradient(45deg, #FFA500, #FFD700); /* Orange for no toppings */
+        }
+        #noToppingsButton:hover {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+        }
+
+        #cancelToppingsButton {
+            background: linear-gradient(45deg, #FF69B4, #FF1493); /* Pink for cancel */
+        }
+        #cancelToppingsButton:hover {
+            background: linear-gradient(45deg, #FF1493, #FF69B4);
+        }
+
+        /* Quantity input styling */
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            gap: 10px;
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #4b0082;
+        }
+
+        .quantity-control input[type="number"] {
+            width: 70px;
+            padding: 8px;
+            border: 2px solid #DDA0DD;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.1em;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            color: #333;
+            -moz-appearance: textfield; /* Hide arrows for Firefox */
+        }
+
+        .quantity-control input[type="number"]::-webkit-outer-spin-button,
+        .quantity-control input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; /* Hide arrows for Chrome, Safari */
+            margin: 0;
+        }
+
+        .quantity-control button {
+            background-color: #87CEEB;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            font-size: 1.5em;
+            font-weight: 900;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1; /* Adjust line height for better centering of text */
+        }
+
+        .quantity-control button:hover {
+            background-color: #00CED1;
+            transform: scale(1.05);
+        }
+        .quantity-control button:active {
+            transform: scale(0.95);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                padding: 15px;
+            }
+
+            .section {
+                min-width: unset; /* Remove min-width for full flexibility */
+                width: 100%;
+            }
+
+            .menu-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .section-title {
+                font-size: 1.5em;
+            }
+
+            .action-button {
+                width: 100%;
+            }
+            .transaction-actions {
+                flex-direction: column;
+            }
+
+            .topping-selection-content {
+                padding: 20px;
+            }
+            .topping-modal-name, .topping-modal-price {
+                font-size: 0.9em;
+            }
+            .add-topping-button {
+                padding: 6px 10px;
+                font-size: 0.8em;
+            }
+            .topping-selection-actions button {
+                font-size: 0.9em;
+                padding: 10px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Punto de Venta Capibobba 🧋✨</h1>
+
+    <div class="container">
+        <!-- Sección de Menú de Productos -->
+        <div class="section menu-section">
+            <h2 class="section-title">Menú de Productos 📋</h2>
+            <div class="menu-grid" id="menuGrid">
+                <!-- Los productos se cargarán aquí dinámicamente con JavaScript -->
+            </div>
+        </div>
+
+        <!-- Sección de Transacción Actual -->
+        <div class="section transaction-section">
+            <h2 class="section-title">Transacción Actual 🛒</h2>
+            <ul class="transaction-list" id="transactionList">
+                <!-- Los ítems de la transacción se cargarán aquí dinámicamente -->
+                <li style="text-align: center; color: #6b7280;">¡Añade productos para empezar!</li>
+            </ul>
+            <div class="transaction-total" id="transactionTotal">Total: $0.00</div>
+            <div class="transaction-actions">
+                <!-- Nuevo botón para confirmación por WhatsApp -->
+                <button class="action-button whatsapp" id="whatsappConfirmationButton">Confirmación de pedido 📱</button>
+                <button class="action-button" id="completeSaleButton">Pagar ✅</button>
+                <button class="action-button clear" id="clearTransactionButton">Vaciar Transacción 🗑️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-
