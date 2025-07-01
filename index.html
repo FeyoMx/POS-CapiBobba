@@ -7,10 +7,14 @@
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#FF69B4"> <!-- Color principal de tu aplicación -->
+    <!-- Meta tags actualizadas para iOS PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Capibobba POS">
     <link rel="apple-touch-icon" href="https://placehold.co/192x192/FF69B4/ffffff?text=CBPOS"> <!-- Icono para iOS -->
+    <!-- Nueva meta tag recomendada para iOS -->
+    <meta name="mobile-web-app-capable" content="yes">
+
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -25,12 +29,32 @@
         window.currentUserId = null; // To store the authenticated user's ID
         window.isAuthReady = false; // Flag to ensure Firestore operations wait for auth
 
-        // Global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Global variables provided by the Canvas environment (NO ESTÁN DISPONIBLES EN PRODUCCIÓN)
+        // const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        // const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        if (firebaseConfig) {
+        // --- REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE REAL ---
+        // Puedes obtener esta configuración desde la consola de Firebase.
+        // Ejemplo:
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_AUTH_DOMAIN",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_STORAGE_BUCKET",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+        // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
+
+        // Para el ID de la aplicación en Firestore, usa un valor fijo o el projectId si no tienes uno específico.
+        const appId = firebaseConfig.projectId || 'capibobba-pos-app'; // Usar projectId como appId si no se define uno específico
+
+        // El token de autenticación inicial no se usa en despliegues públicos de esta manera.
+        // Se usará signInAnonymously directamente.
+        const initialAuthToken = null; // No aplicable para despliegue público sin un sistema de auth más complejo
+
+        if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Verifica que la configuración sea válida
             window.firebaseApp = initializeApp(firebaseConfig);
             window.auth = getAuth(window.firebaseApp);
             window.db = getFirestore(window.firebaseApp);
@@ -43,15 +67,11 @@
                 } else {
                     // Sign in anonymously if no user is logged in (e.g., first time loading)
                     try {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(window.auth, initialAuthToken);
-                            window.currentUserId = window.auth.currentUser.uid;
-                            console.log("Firebase: Signed in with custom token. UID:", window.currentUserId);
-                        } else {
-                            await signInAnonymously(window.auth);
-                            window.currentUserId = window.auth.currentUser.uid;
-                            console.log("Firebase: Signed in anonymously. UID:", window.currentUserId);
-                        }
+                        // En un despliegue público, nos autenticamos anónimamente si no hay token.
+                        // El token inicial solo se usa en el entorno de Canvas.
+                        await signInAnonymously(window.auth);
+                        window.currentUserId = window.auth.currentUser.uid;
+                        console.log("Firebase: Signed in anonymously. UID:", window.currentUserId);
                     } catch (error) {
                         console.error("Firebase: Error during authentication:", error);
                         // Fallback to a random ID if authentication fails
@@ -64,7 +84,7 @@
                 document.dispatchEvent(new Event('firebaseAuthReady'));
             });
         } else {
-            console.error("Firebase: firebaseConfig is not defined. Persistence will not work.");
+            console.error("Firebase: firebaseConfig no está completo o es inválido. La persistencia no funcionará.");
             // If Firebase config is missing, proceed without persistence but log a warning
             window.isAuthReady = true;
             window.currentUserId = crypto.randomUUID(); // Use a random ID for local operations
@@ -1120,7 +1140,8 @@
         const firebaseApp = window.firebaseApp;
         const db = window.db;
         const auth = window.auth;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Re-access appId
+        // const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Re-access appId
+        // Ahora appId se define arriba con firebaseConfig.projectId
 
         let currentUserId = window.currentUserId; // Will be updated by the onAuthStateChanged listener
         let isAuthReady = window.isAuthReady; // Flag from the global script
@@ -1541,7 +1562,8 @@
             };
 
             try {
-                const salesCollectionRef = collection(window.db, `artifacts/${appId}/users/${window.currentUserId}/dailySales`);
+                // Usa la variable appId definida globalmente en el script de Firebase
+                const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`);
 
                 if (editingSaleDocId) {
                     // Update existing document
@@ -1591,7 +1613,8 @@
             }
 
             try {
-                const saleDocRef = doc(window.db, `artifacts/${appId}/users/${window.currentUserId}/dailySales`, saleId);
+                // Usa la variable appId definida globalmente en el script de Firebase
+                const saleDocRef = doc(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`, saleId);
                 await deleteDoc(saleDocRef);
                 console.log("Document successfully deleted with ID: ", saleId);
                 showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
@@ -1955,7 +1978,8 @@
                     console.log("POS Script: Firebase Auth is ready. Setting up Firestore listener.");
                     console.log("POS Script: Current User ID:", currentUserId);
                     // Set up real-time listener for daily sales
-                    const salesCollectionRef = collection(window.db, `artifacts/${appId}/users/${currentUserId}/dailySales`);
+                    // Usa la variable appId definida globalmente en el script de Firebase
+                    const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/users/${currentUserId}/dailySales`);
                     const q = query(salesCollectionRef, orderBy("timestamp", "desc")); // Order by timestamp descending
 
                     onSnapshot(q, (snapshot) => {
