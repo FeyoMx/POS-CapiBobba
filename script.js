@@ -1,7 +1,6 @@
 // Importa solo los módulos de Firestore que necesita este script
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // Importa los módulos de autenticación de Firebase
-// Añadimos sendPasswordResetEmail
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, signInAnonymously, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 
@@ -23,7 +22,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // NUEVA RUTA PARA VENTAS GLOBALES
-    match /artifacts/{appId}/public/dailySales/{saleId} {
+    match /artifacts/{appId}/public/data/dailySales/{saleId} { // CAMBIO AQUÍ: Añadido '/data'
       allow read, write: if request.auth != null; // Cualquier usuario autenticado puede leer/escribir
     }
     // RUTA PARA DATOS PRIVADOS DE USUARIO (se mantiene si se necesita)
@@ -694,7 +693,8 @@ async function completeSale() {
     };
 
     try {
-        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/public/dailySales`);
+        // CAMBIO CLAVE: Apuntar a la colección pública con la ruta corregida
+        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/public/data/dailySales`);
 
         if (editingSaleDocId) {
             const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
@@ -750,7 +750,8 @@ async function deleteSale(saleId) {
     }
 
     try {
-        const saleDocRef = doc(window.db, `artifacts/${window.appId}/public/dailySales`, saleId);
+        // CAMBIO CLAVE: Apuntar a la colección pública con la ruta corregida para eliminar
+        const saleDocRef = doc(window.db, `artifacts/${window.appId}/public/data/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);
         showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
@@ -1257,7 +1258,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Firestore: Listener anterior desuscrito.");
             }
 
-            const salesCollectionRef = collection(window.db, `artifacts/${appId}/public/dailySales`);
+            // CAMBIO CLAVE: Apuntar a la colección pública con la ruta corregida para el listener
+            const salesCollectionRef = collection(window.db, `artifacts/${appId}/public/data/dailySales`);
             const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
 
             // Suscribirse al listener y guardar la función de desuscripción
@@ -1305,4 +1307,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
