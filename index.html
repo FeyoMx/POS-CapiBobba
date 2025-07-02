@@ -30,7 +30,8 @@
     <script type="module" defer>
         // Importa los módulos necesarios para la inicialización y autenticación
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Eliminamos signInAnonymously de aquí, ya que no será el default automático
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Hacer las instancias de Firebase disponibles globalmente
@@ -63,25 +64,19 @@
             window.db = getFirestore(window.firebaseApp);
 
             // Escuchar cambios en el estado de autenticación
-            onAuthStateChanged(window.auth, async (user) => {
+            onAuthStateChanged(window.auth, (user) => {
                 if (user) {
-                    // El usuario está autenticado (ya sea existente, anónimo o por email/password)
+                    // El usuario está autenticado (ya sea existente o por email/password)
                     window.currentUserId = user.uid; // Asigna el UID del usuario autenticado
-                    window.currentUserEmail = user.email || 'Anónimo'; // Asigna el email o 'Anónimo'
+                    window.currentUserEmail = user.email || 'Anónimo'; // Asigna el email o 'Anónimo' si es anónimo
                     window.isAuthReady = true; // La autenticación está lista
                     console.log("Firebase: Usuario autenticado. UID:", user.uid, "Email:", window.currentUserEmail);
                 } else {
-                    // No hay usuario autenticado. Intentar autenticación anónima como fallback.
-                    console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima como fallback...");
-                    try {
-                        await signInAnonymously(window.auth);
-                        // onAuthStateChanged se disparará de nuevo con el usuario anónimo
-                    } catch (error) {
-                        console.error("Firebase: Error durante la autenticación anónima:", error);
-                        window.currentUserId = null; // Si la autenticación falla, no hay UID válido
-                        window.currentUserEmail = null; // No hay email
-                        window.isAuthReady = false; // La autenticación NO está lista
-                    }
+                    // No hay usuario autenticado. No se intenta signInAnonymously automáticamente.
+                    window.currentUserId = null;
+                    window.currentUserEmail = null;
+                    window.isAuthReady = true; // La verificación de autenticación ha terminado, pero no hay usuario
+                    console.log("Firebase: No hay usuario autenticado. Se requiere inicio de sesión/registro.");
                 }
                 // Siempre despachar el evento para que script.js sepa que el estado de auth ha sido evaluado
                 document.dispatchEvent(new Event('firebaseAuthReady'));
