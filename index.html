@@ -28,17 +28,17 @@
 
     <!-- Firebase SDKs - Inicialización temprana para el listener de autenticación -->
     <script type="module" defer>
-        // Importa solo los módulos necesarios para la inicialización y autenticación
+        // Importa los módulos necesarios para la inicialización y autenticación
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Hacer las instancias de Firebase disponibles globalmente
-        // Esto permite que el script principal (script.js) las use una vez que estén listas.
         window.firebaseApp = null;
         window.db = null;
         window.auth = null;
         window.currentUserId = null; // Para almacenar el ID del usuario autenticado
+        window.currentUserEmail = null; // Para almacenar el email del usuario autenticado
         window.isAuthReady = false; // Bandera para asegurar que las operaciones de Firestore esperen la autenticación
 
         // --- REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE REAL ---
@@ -65,25 +65,22 @@
             // Escuchar cambios en el estado de autenticación
             onAuthStateChanged(window.auth, async (user) => {
                 if (user) {
-                    // El usuario está autenticado (ya sea existente o anónimo recién logueado)
+                    // El usuario está autenticado (ya sea existente, anónimo o por email/password)
                     window.currentUserId = user.uid; // Asigna el UID del usuario autenticado
+                    window.currentUserEmail = user.email || 'Anónimo'; // Asigna el email o 'Anónimo'
                     window.isAuthReady = true; // La autenticación está lista
-                    console.log("Firebase: Usuario autenticado. UID:", user.uid);
+                    console.log("Firebase: Usuario autenticado. UID:", user.uid, "Email:", window.currentUserEmail);
                 } else {
-                    // No hay usuario autenticado, intenta la autenticación anónima
-                    console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima...");
+                    // No hay usuario autenticado. Intentar autenticación anónima como fallback.
+                    console.log("Firebase: No hay usuario autenticado. Intentando autenticación anónima como fallback...");
                     try {
-                        const userCredential = await signInAnonymously(window.auth);
-                        // Después de un signInAnonymously exitoso, onAuthStateChanged se disparará de nuevo
-                        // con el nuevo usuario anónimo, y la rama 'if (user)' de arriba lo manejará.
-                        window.currentUserId = userCredential.user.uid; // Aseguramos que se asigne aquí también
-                        window.isAuthReady = true; // La autenticación anónima fue exitosa
-                        console.log("Firebase: Sesión anónima iniciada. UID:", window.currentUserId);
+                        await signInAnonymously(window.auth);
+                        // onAuthStateChanged se disparará de nuevo con el usuario anónimo
                     } catch (error) {
                         console.error("Firebase: Error durante la autenticación anónima:", error);
                         window.currentUserId = null; // Si la autenticación falla, no hay UID válido
+                        window.currentUserEmail = null; // No hay email
                         window.isAuthReady = false; // La autenticación NO está lista
-                        // Informar al script principal que la autenticación no fue exitosa
                     }
                 }
                 // Siempre despachar el evento para que script.js sepa que el estado de auth ha sido evaluado
@@ -93,11 +90,18 @@
             console.error("Firebase: firebaseConfig no está completo o es inválido. La persistencia no funcionará.");
             window.isAuthReady = false; // No puede estar listo si la configuración es mala
             window.currentUserId = null; // No hay un ID de usuario válido
+            window.currentUserEmail = null; // No hay email
             document.dispatchEvent(new Event('firebaseAuthReady'));
         }
     </script>
 </head>
 <body>
+    <!-- Nueva barra de encabezado para el estado del usuario y autenticación -->
+    <header class="app-header">
+        <span id="userStatus" class="user-status">Cargando usuario...</span>
+        <button id="authButton" class="auth-button">Iniciar Sesión / Registrarse</button>
+    </header>
+
     <h1>Punto de Venta Capibobba 🧋✨</h1>
 
     <!-- Uso de <main> para el contenido principal de la página (accesibilidad y semántica) -->
@@ -217,6 +221,32 @@
                 <button id="noToppingsButton">Sin Toppings 🚫</button>
                 <button id="cancelToppingsButton">Cancelar ❌</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Nuevo Modal para Autenticación (Iniciar Sesión / Registrarse) -->
+    <div id="authModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+        <div class="modal-content auth-modal-content">
+            <h3 id="authModalTitle" class="section-title">Iniciar Sesión o Registrarse</h3>
+            
+            <div class="auth-tabs">
+                <button id="showLoginTab" class="auth-tab-button active">Iniciar Sesión</button>
+                <button id="showRegisterTab" class="auth-tab-button">Registrarse</button>
+            </div>
+
+            <form id="loginForm" class="auth-form">
+                <input type="email" id="loginEmail" placeholder="Correo Electrónico" required aria-label="Correo Electrónico para iniciar sesión">
+                <input type="password" id="loginPassword" placeholder="Contraseña" required aria-label="Contraseña para iniciar sesión">
+                <button type="submit" class="action-button">Iniciar Sesión</button>
+            </form>
+
+            <form id="registerForm" class="auth-form hidden">
+                <input type="email" id="registerEmail" placeholder="Correo Electrónico" required aria-label="Correo Electrónico para registrarse">
+                <input type="password" id="registerPassword" placeholder="Contraseña" required aria-label="Contraseña para registrarse">
+                <button type="submit" class="action-button">Registrarse</button>
+            </form>
+
+            <button id="closeAuthModal" class="modal-close-button" aria-label="Cerrar modal de autenticación">Cerrar</button>
         </div>
     </div>
 
