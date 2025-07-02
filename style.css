@@ -47,14 +47,14 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh; /* Asegura que el body ocupe al menos toda la altura de la ventana */
+    min-height: 100vh; /* Ensures the body takes at least the full viewport height */
 }
 
 h1 {
     color: var(--capibobba-purple);
     text-align: center;
     margin-bottom: 30px;
-    font-size: 2.5em; /* Tamaño de fuente responsivo */
+    font-size: 2.5em; /* Responsive font size */
     text-shadow: var(--shadow-light);
 }
 
@@ -67,7 +67,7 @@ h2 {
 
 .container {
     display: flex;
-    flex-wrap: wrap; /* Permite que las secciones se envuelvan en pantallas pequeñas */
+    flex-wrap: wrap; /* Allows sections to wrap on small screens */
     gap: 25px;
     width: 100%;
     max-width: 1200px;
@@ -79,8 +79,8 @@ h2 {
     padding: 25px;
     border-radius: var(--border-radius-large);
     box-shadow: var(--shadow-medium);
-    flex: 1; /* Permite que las secciones crezcan y se encojan */
-    min-width: 300px; /* Ancho mínimo para evitar que se aplasten demasiado */
+    flex: 1; /* Allows sections to grow and shrink */
+    min-width: 300px; /* Minimum width to prevent excessive shrinking */
 }
 
 .section-title {
@@ -89,14 +89,14 @@ h2 {
     text-align: center;
 }
 
-/* --- Estilos de la Sección de Menú --- */
+/* --- Menu Section Styles --- */
 .menu-section {
-    flex: 2; /* El menú puede ocupar más espacio */
+    flex: 2; /* Menu can take up more space */
 }
 
 .menu-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Columnas responsivas */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Responsive columns */
     gap: 15px;
 }
 
@@ -111,7 +111,7 @@ h2 {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 100px; /* Asegura un tamaño mínimo para los elementos del menú */
+    min-height: 100px; /* Ensures a minimum size for menu items */
 }
 
 .menu-item:hover {
@@ -139,14 +139,14 @@ h2 {
 
 .item-price {
     font-weight: 600;
-    color: var(--text-dark); /* Color por defecto */
+    color: var(--text-dark); /* Default color */
 }
 
 .menu-item:hover .item-price {
-    color: var(--text-light); /* Cambia el color del precio al pasar el ratón */
+    color: var(--text-light); /* Changes price color on hover */
 }
 
-/* --- Estilos de la Sección de Transacción --- */
+/* --- Transaction Section Styles --- */
 .transaction-section {
     flex: 1;
     display: flex;
@@ -156,10 +156,10 @@ h2 {
 .transaction-list {
     list-style: none;
     margin-bottom: 20px;
-    flex-grow: 1; /* Permite que la lista ocupe el espacio disponible */
-    overflow-y: auto; /* Habilita el scroll si la lista es muy larga */
-    max-height: 400px; /* Altura máxima para la lista de transacciones */
-    padding-right: 5px; /* Espacio para la barra de scroll */
+    flex-grow: 1; /* Allows the list to take available space */
+    overflow-y: auto; /* Enables scrolling if the list is too long */
+    max-height: 400px; /* Maximum height for transaction list */
+    padding-right: 5px; /* Space for scrollbar */
 }
 
 .transaction-item {
@@ -199,10 +199,10 @@ h2 {
 }
 
 .remove-item-btn {
-    background-color: #dc3545; /* Rojo para eliminar */
+    background-color: #dc3545; /* Red for removal */
     color: white;
     border: none;
-    border-radius: 50%; /* Botón redondo */
+    border-radius: 50%; /* Round button */
     width: 30px;
     height: 30px;
     font-size: 1.2em;
@@ -253,16 +253,16 @@ h2 {
     cursor: pointer;
     transition: var(--transition-fast);
     flex-grow: 1;
-    min-width: 150px; /* Asegura que los botones no se aplasten demasiado */
+    min-width: 150px; /* Ensures buttons don't get too squashed */
 }
 
 .action-button:hover {
-    background-color: #28a745; /* Verde más oscuro */
+    background-color: #28a745; /* Darker green */
     box-shadow: var(--shadow-light);
 }
 
 .action-button.whatsapp {
-    background-color: #25D366; /* Verde WhatsApp */
+    background-color: #25D366; /* WhatsApp Green */
 }
 
 .action-button.whatsapp:hover {
@@ -282,7 +282,7 @@ h2 {
     outline-offset: 3px;
 }
 
-/* --- Estilos de la Sección de Ventas Diarias --- */
+/* --- Daily Sales Section Styles --- */
 .daily-sales-section {
     width: 100%;
     max-width: 1200px;
@@ -295,8 +295,8 @@ h2 {
 
 .sales-list {
     list-style: none;
-    max-height: 500px; /* Altura máxima para la lista de ventas */
-    overflow-y: auto; /* Habilita el scroll */
+    max-height: 500px; /* Maximum height for sales list */
+    overflow-y: auto; /* Enables scrolling */
     padding-right: 5px;
 }
 
@@ -367,7 +367,7 @@ h2 {
 }
 
 .sale-action-btn.edit:hover {
-    background-color: #FFC400; /* Amarillo más oscuro */
+    background-color: #FFC400; /* Darker yellow */
 }
 
 .sale-action-btn.delete {
@@ -489,7 +489,7 @@ input:checked + .slider:before {
 }
 
 .sales-filter-controls .filter:hover {
-    background-color: #6A1A9A; /* Morado más oscuro */
+    background-color: #6A1A9A; /* Darker purple */
 }
 
 .sales-filter-controls .clear-filter {
@@ -505,7 +505,7 @@ input:checked + .slider:before {
     display: none !important;
 }
 
-/* --- Estilos de la Sección de Informes --- */
+/* --- Reports Section Styles --- */
 .sales-reports-section {
     width: 100%;
     max-width: 1200px;
@@ -585,7 +585,7 @@ input:checked + .slider:before {
     color: var(--capibobba-pink);
 }
 
-/* --- Estilos de Modales (Mensaje y Confirmación) --- */
+/* --- Modal Styles (Message and Confirmation) --- */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -673,18 +673,19 @@ input:checked + .slider:before {
     background-color: var(--secondary-dark-gray);
 }
 
-/* --- Estilos del Modal de Selección de Toppings --- */
+/* --- Topping Selection Modal Styles (IMPROVED FOR RESPONSIVENESS) --- */
 .topping-selection-content {
     background-color: var(--background-white);
     padding: 25px;
     border-radius: var(--border-radius-large);
     box-shadow: var(--shadow-strong);
     text-align: center;
-    max-width: 600px;
-    width: 90%;
+    max-width: 600px; /* Max width for larger screens */
+    width: 95%; /* Take up more width on smaller screens */
     transform: translateY(-20px);
     opacity: 0;
     transition: transform 0.3s ease, opacity 0.3s ease;
+    box-sizing: border-box; /* Include padding in the width calculation */
 }
 
 .modal-overlay.show .topping-selection-content {
@@ -713,7 +714,8 @@ input:checked + .slider:before {
 
 .toppings-modal-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    /* Adjusted minmax for better mobile layout: 100px min per item */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
     gap: 15px;
     margin-bottom: 20px;
     padding: 10px;
@@ -746,10 +748,11 @@ input:checked + .slider:before {
     font-weight: 700;
     color: var(--text-dark);
     margin-bottom: 5px;
+    font-size: 0.9em; /* Slightly smaller for better fit in grid */
 }
 
 .topping-modal-price {
-    font-size: 0.9em;
+    font-size: 0.8em; /* Slightly smaller */
     color: var(--text-gray);
 }
 
@@ -771,7 +774,7 @@ input:checked + .slider:before {
 }
 
 .add-topping-button.remove {
-    background-color: #dc3545; /* Rojo para quitar */
+    background-color: #dc3545; /* Red for removal */
 }
 
 .add-topping-button.remove:hover {
@@ -799,9 +802,9 @@ input:checked + .slider:before {
     color: white;
     border: none;
     border-radius: 50%;
-    width: 35px;
-    height: 35px;
-    font-size: 1.2em;
+    width: 40px; /* Slightly larger buttons */
+    height: 40px; /* Slightly larger buttons */
+    font-size: 1.4em; /* Larger icon/text */
     cursor: pointer;
     transition: var(--transition-fast);
     display: flex;
@@ -814,14 +817,14 @@ input:checked + .slider:before {
 }
 
 .quantity-control input[type="number"] {
-    width: 60px;
-    padding: 8px 5px;
+    width: 70px; /* Slightly wider input */
+    padding: 10px 5px; /* More padding */
     text-align: center;
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-small);
     font-family: var(--primary-font);
-    font-size: 1.1em;
-    -moz-appearance: textfield; /* Oculta flechas en Firefox */
+    font-size: 1.2em; /* Larger font */
+    -moz-appearance: textfield; /* Hides arrows in Firefox */
 }
 
 .quantity-control input[type="number"]::-webkit-outer-spin-button,
@@ -831,7 +834,7 @@ input:checked + .slider:before {
 }
 
 .topping-modal-total {
-    font-size: 1.4em;
+    font-size: 1.6em; /* Slightly larger total price */
     font-weight: 800;
     color: var(--capibobba-pink);
     margin-bottom: 20px;
@@ -841,14 +844,16 @@ input:checked + .slider:before {
 
 .topping-selection-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: wrap; /* Allows buttons to wrap */
+    gap: 15px; /* Increased gap for better spacing */
     justify-content: center;
 }
 
 .topping-selection-actions button {
     flex-grow: 1;
-    min-width: 150px;
+    min-width: 140px; /* Minimum width for buttons */
+    padding: 15px 25px; /* Larger padding for bigger tap targets */
+    font-size: 1.1em; /* Larger font size for buttons */
 }
 
 #confirmToppingsButton {
@@ -870,7 +875,7 @@ input:checked + .slider:before {
     background-color: var(--secondary-dark-gray);
 }
 
-/* --- Estilos para el Modal de Autenticación (NUEVO) --- */
+/* --- Authentication Modal Styles --- */
 .auth-modal-content {
     max-width: 450px;
     padding: 25px;
@@ -881,20 +886,20 @@ input:checked + .slider:before {
     justify-content: center;
     margin-bottom: 20px;
     border-bottom: 2px solid var(--border-light-gray);
-    flex-wrap: wrap; /* Permite que los botones se envuelvan en pantallas pequeñas */
+    flex-wrap: wrap; /* Allows buttons to wrap on small screens */
 }
 
 .auth-tab-button {
     background: none;
     border: none;
-    padding: 10px 15px; /* Ajustado para más espacio */
-    font-size: 1em; /* Ajustado para que quepan 3 */
+    padding: 10px 15px; /* Adjusted for more space */
+    font-size: 1em; /* Adjusted to fit 3 buttons */
     font-weight: 700;
     color: var(--text-gray);
     cursor: pointer;
     transition: all 0.3s ease;
     border-bottom: 3px solid transparent;
-    flex-grow: 1; /* Permite que los botones crezcan para ocupar espacio */
+    flex-grow: 1; /* Allows buttons to grow to fill space */
     text-align: center;
 }
 
@@ -922,7 +927,7 @@ input:checked + .slider:before {
     font-family: var(--primary-font);
     font-size: 1em;
     width: 100%;
-    box-sizing: border-box; /* Incluye padding y border en el ancho */
+    box-sizing: border-box; /* Includes padding and border in width */
 }
 
 .auth-form input[type="email"]:focus,
@@ -933,8 +938,8 @@ input:checked + .slider:before {
 }
 
 .auth-form .action-button {
-    width: auto; /* Permite que el botón se ajuste al contenido */
-    align-self: center; /* Centra el botón en el formulario */
+    width: auto; /* Allows button to adjust to content */
+    align-self: center; /* Centers the button in the form */
     padding: 10px 30px;
     margin-top: 10px;
 }
@@ -955,7 +960,7 @@ input:checked + .slider:before {
     background-color: var(--secondary-dark-gray);
 }
 
-/* Estilos para la barra de encabezado */
+/* Header Bar Styles */
 .app-header {
     width: 100%;
     max-width: 1200px;
@@ -989,7 +994,7 @@ input:checked + .slider:before {
 }
 
 .auth-button:hover {
-    background-color: #FF1493; /* Un rosa más oscuro */
+    background-color: #FF1493; /* Darker pink */
 }
 
 .auth-button:focus {
@@ -997,7 +1002,7 @@ input:checked + .slider:before {
     outline-offset: 2px;
 }
 
-/* Estilos para el enlace de "Olvidaste tu contraseña" */
+/* "Forgot Password" link styles */
 .forgot-password-link {
     color: var(--capibobba-purple);
     text-decoration: none;
@@ -1012,7 +1017,7 @@ input:checked + .slider:before {
     text-decoration: underline;
 }
 
-/* Estilos para el botón "Volver a Iniciar Sesión" */
+/* "Back to Login" button styles */
 .back-button {
     background-color: var(--secondary-gray);
     color: white;
@@ -1032,7 +1037,7 @@ input:checked + .slider:before {
 }
 
 
-/* Estilos para la descripción del formulario de recuperación */
+/* Description for password reset form */
 .form-description {
     font-size: 0.95em;
     color: var(--text-gray);
@@ -1040,7 +1045,7 @@ input:checked + .slider:before {
     margin-bottom: 15px;
 }
 
-/* Responsive adjustments for header */
+/* Responsive adjustments */
 @media (max-width: 768px) {
     h1 {
         font-size: 2em;
@@ -1094,7 +1099,7 @@ input:checked + .slider:before {
         width: 100%;
         min-width: unset;
     }
-    .modal-content, .topping-selection-content, .auth-modal-content {
+    .modal-content, .auth-modal-content {
         padding: 20px;
         width: 95%;
     }
@@ -1105,7 +1110,7 @@ input:checked + .slider:before {
         font-size: 1em;
     }
     .auth-tabs {
-        flex-direction: column; /* Apila los botones en pantallas pequeñas */
+        flex-direction: column; /* Stacks buttons on small screens */
     }
     .auth-tab-button {
         padding: 8px 10px;
@@ -1122,7 +1127,47 @@ input:checked + .slider:before {
     }
     .auth-button {
         width: 100%;
-        max-width: 250px; /* Limita el ancho en móviles también */
+        max-width: 250px; /* Limits width on mobile too */
+    }
+
+    /* Specific adjustments for topping modal on mobile */
+    .topping-selection-content {
+        padding: 15px; /* Reduced padding for more content space */
+        width: 98%; /* Take even more width on very small screens */
+    }
+    .toppings-modal-grid {
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* Allow smaller topping items */
+        gap: 10px; /* Reduced gap */
+    }
+    .topping-modal-item {
+        min-height: 70px; /* Smaller min height */
+        padding: 8px; /* Reduced padding */
+    }
+    .topping-modal-name {
+        font-size: 0.85em; /* Slightly smaller font */
+    }
+    .topping-modal-price {
+        font-size: 0.75em; /* Slightly smaller font */
+    }
+    .add-topping-button {
+        padding: 4px 8px; /* Smaller padding for the add/remove button */
+        font-size: 0.7em; /* Smaller font for the add/remove button */
+    }
+    .quantity-control button {
+        width: 35px; /* Slightly smaller quantity buttons */
+        height: 35px;
+        font-size: 1.2em;
+    }
+    .quantity-control input[type="number"] {
+        width: 50px; /* Smaller quantity input */
+        font-size: 1em;
+    }
+    .topping-modal-total {
+        font-size: 1.4em; /* Adjusted total price font size */
+    }
+    .topping-selection-actions button {
+        padding: 12px 20px; /* Ensure buttons are still large enough for tapping */
+        font-size: 1em; /* Adjusted font size */
     }
 }
 
