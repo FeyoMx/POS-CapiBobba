@@ -1,12 +1,12 @@
-/* --- Variables CSS para colores y fuentes --- */
+/* --- CSS Variables --- */
 :root {
     --primary-font: 'Nunito', sans-serif;
     
-    --capibobba-purple: #8A2BE2; /* Azul violeta */
-    --capibobba-pink: #FF69B4;  /* Rosa fuerte */
-    --capibobba-light-pink: #FFC0CB; /* Rosa claro */
-    --capibobba-yellow: #FFD700; /* Dorado */
-    --capibobba-green: #32CD32; /* Verde lima */
+    --capibobba-purple: #8A2BE2; /* Violet blue */
+    --capibobba-pink: #FF69B4;  /* Strong pink */
+    --capibobba-light-pink: #FFC0CB; /* Light pink */
+    --capibobba-yellow: #FFD700; /* Gold */
+    --capibobba-green: #32CD32; /* Lime green */
 
     --background-light: #F8F8F8;
     --background-white: #FFFFFF;
@@ -31,7 +31,7 @@
     --transition-medium: all 0.3s ease-in-out;
 }
 
-/* --- Estilos Generales y Reseteo Básico --- */
+/* --- General Styles and Basic Reset --- */
 * {
     margin: 0;
     padding: 0;
@@ -747,8 +747,8 @@ input:checked + .slider:before {
 .topping-modal-name {
     font-weight: 700;
     color: var(--text-dark);
-    margin-bottom: 5px;
     font-size: 0.9em; /* Slightly smaller for better fit in grid */
+    margin-bottom: 5px;
 }
 
 .topping-modal-price {
@@ -847,6 +847,9 @@ input:checked + .slider:before {
     flex-wrap: wrap; /* Allows buttons to wrap */
     gap: 15px; /* Increased gap for better spacing */
     justify-content: center;
+    /* NEW: Ensure buttons are at the bottom and take full width on small screens */
+    width: 100%; 
+    margin-top: auto; /* Pushes buttons to the bottom if container has flex-direction column */
 }
 
 .topping-selection-actions button {
@@ -854,7 +857,23 @@ input:checked + .slider:before {
     min-width: 140px; /* Minimum width for buttons */
     padding: 15px 25px; /* Larger padding for bigger tap targets */
     font-size: 1.1em; /* Larger font size for buttons */
+    /* NEW: Ensure buttons take full available width on small screens */
+    width: 100%; 
+    max-width: 200px; /* Limit individual button width on larger screens */
 }
+
+/* NEW: Specific media query for very small screens to stack buttons */
+@media (max-width: 480px) {
+    .topping-selection-actions {
+        flex-direction: column; /* Stack buttons vertically */
+        align-items: center; /* Center stacked buttons */
+        gap: 10px; /* Reduce gap when stacked */
+    }
+    .topping-selection-actions button {
+        max-width: 90%; /* Allow buttons to be wider when stacked */
+    }
+}
+
 
 #confirmToppingsButton {
     background-color: var(--capibobba-green);
