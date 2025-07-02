@@ -1,7 +1,8 @@
 // Importa solo los módulos de Firestore que necesita este script
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // Importa los módulos de autenticación de Firebase
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// Añadimos sendPasswordResetEmail
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, signInAnonymously, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 
 // Accede a las instancias globales de Firebase que se inicializaron en index.html
@@ -101,12 +102,18 @@ const authButton = document.getElementById('authButton');
 const authModalOverlay = document.getElementById('authModalOverlay');
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
+const passwordResetForm = document.getElementById('passwordResetForm'); // Nuevo: formulario de recuperación
 const loginEmailInput = document.getElementById('loginEmail');
 const loginPasswordInput = document.getElementById('loginPassword');
 const registerEmailInput = document.getElementById('registerEmail');
 const registerPasswordInput = document.getElementById('registerPassword');
+const resetEmailInput = document.getElementById('resetEmail'); // Nuevo: input de email para recuperación
+const forgotPasswordLink = document.getElementById('forgotPasswordLink'); // Nuevo: enlace "¿Olvidaste tu contraseña?"
+const backToLoginFromResetButton = document.getElementById('backToLoginFromReset'); // Nuevo: botón para volver al login
+
 const showLoginTabButton = document.getElementById('showLoginTab');
 const showRegisterTabButton = document.getElementById('showRegisterTab');
+const showPasswordResetTabButton = document.getElementById('showPasswordResetTab'); // Nuevo: botón de tab para recuperación
 const closeAuthModalButton = document.getElementById('closeAuthModal');
 
 
@@ -220,10 +227,19 @@ function cancelToppingSelection() {
 /**
  * Opens the authentication modal.
  */
-function openAuthModal() {
+function openAuthModal(initialTab = 'login') { // Añadido parámetro para la pestaña inicial
     lastFocusedElement = document.activeElement;
     authModalOverlay.classList.add('show');
     trapFocus(authModalOverlay.querySelector('.modal-content'));
+
+    // Mostrar la pestaña inicial
+    if (initialTab === 'register') {
+        showRegisterTab();
+    } else if (initialTab === 'reset') {
+        showPasswordResetTab();
+    } else {
+        showLoginTab();
+    }
 }
 
 /**
@@ -243,8 +259,10 @@ function closeAuthModal() {
 function showLoginTab() {
     loginForm.classList.remove('hidden');
     registerForm.classList.add('hidden');
+    passwordResetForm.classList.add('hidden'); // Ocultar formulario de reset
     showLoginTabButton.classList.add('active');
     showRegisterTabButton.classList.remove('active');
+    showPasswordResetTabButton.classList.remove('active'); // Desactivar tab de reset
     loginEmailInput.focus(); // Set focus to email input
 }
 
@@ -254,9 +272,24 @@ function showLoginTab() {
 function showRegisterTab() {
     registerForm.classList.remove('hidden');
     loginForm.classList.add('hidden');
+    passwordResetForm.classList.add('hidden'); // Ocultar formulario de reset
     showRegisterTabButton.classList.add('active');
     showLoginTabButton.classList.remove('active');
+    showPasswordResetTabButton.classList.remove('active'); // Desactivar tab de reset
     registerEmailInput.focus(); // Set focus to email input
+}
+
+/**
+ * Switches the active tab in the authentication modal to password reset.
+ */
+function showPasswordResetTab() {
+    passwordResetForm.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+    registerForm.classList.add('hidden');
+    showPasswordResetTabButton.classList.add('active');
+    showLoginTabButton.classList.remove('active');
+    showRegisterTabButton.classList.remove('active');
+    resetEmailInput.focus(); // Set focus to email input
 }
 
 
@@ -661,7 +694,6 @@ async function completeSale() {
     };
 
     try {
-        // CAMBIO CLAVE: Apuntar a la colección pública
         const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/public/dailySales`);
 
         if (editingSaleDocId) {
@@ -718,7 +750,6 @@ async function deleteSale(saleId) {
     }
 
     try {
-        // CAMBIO CLAVE: Apuntar a la colección pública para eliminar
         const saleDocRef = doc(window.db, `artifacts/${window.appId}/public/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);
@@ -738,8 +769,6 @@ async function deleteSale(saleId) {
  * @param {string} saleId The ID of the sale document to edit.
  */
 function editSale(saleId) {
-    // NOTA: Para editar una venta, la aplicación debe tener acceso a todas las ventas (globales).
-    // La lógica actual de `dailySales` ya contiene todas las ventas cargadas por el listener global.
     const saleToEdit = dailySales.find(sale => sale.id === saleId);
     if (saleToEdit) {
         currentTransaction = JSON.parse(JSON.stringify(saleToEdit.items));
@@ -1064,6 +1093,35 @@ async function handleLogout() {
     });
 }
 
+/**
+ * Handles sending a password reset email.
+ * @param {Event} event The form submission event.
+ */
+async function handlePasswordReset(event) {
+    event.preventDefault();
+    const email = resetEmailInput.value;
+
+    if (!email) {
+        showMessage('Correo Requerido', 'Por favor, introduce tu correo electrónico.');
+        return;
+    }
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+        showMessage('Correo Enviado', `Se ha enviado un enlace de restablecimiento de contraseña a ${email}. Revisa tu bandeja de entrada.`);
+        closeAuthModal();
+    } catch (error) {
+        console.error("Error al enviar correo de restablecimiento:", error);
+        let errorMessage = "Error al enviar el correo de restablecimiento.";
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = "No hay ningún usuario registrado con ese correo electrónico.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "El formato del correo electrónico es inválido.";
+        }
+        showMessage('Error', errorMessage);
+    }
+}
+
 
 // --- Event Listeners ---
 completeSaleButton.addEventListener('click', completeSale);
@@ -1145,14 +1203,21 @@ authButton.addEventListener('click', () => {
     if (auth.currentUser) { // Si hay un usuario logueado
         handleLogout();
     } else { // Si no hay usuario logueado
-        openAuthModal();
+        openAuthModal(); // Abre el modal en la pestaña de login por defecto
     }
 });
 closeAuthModalButton.addEventListener('click', closeAuthModal);
 showLoginTabButton.addEventListener('click', showLoginTab);
 showRegisterTabButton.addEventListener('click', showRegisterTab);
+showPasswordResetTabButton.addEventListener('click', showPasswordResetTab); // Nuevo: listener para el tab de recuperación
 loginForm.addEventListener('submit', handleLogin);
 registerForm.addEventListener('submit', handleRegister);
+passwordResetForm.addEventListener('submit', handlePasswordReset); // Nuevo: listener para el formulario de recuperación
+forgotPasswordLink.addEventListener('click', (e) => { // Nuevo: listener para el enlace de "Olvidaste tu contraseña"
+    e.preventDefault();
+    showPasswordResetTab();
+});
+backToLoginFromResetButton.addEventListener('click', showLoginTab); // Nuevo: listener para volver al login
 
 
 // --- Initial Setup ---
@@ -1192,7 +1257,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Firestore: Listener anterior desuscrito.");
             }
 
-            // CAMBIO CLAVE: Apuntar a la colección pública para el listener
             const salesCollectionRef = collection(window.db, `artifacts/${appId}/public/dailySales`);
             const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
 
@@ -1232,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Mostrar el modal de autenticación si no hay usuario autenticado al inicio
             if (isAuthReady && !currentUserId) { // isAuthReady es true si la verificación inicial terminó
-                openAuthModal();
+                openAuthModal(); // Abre el modal en la pestaña de login por defecto
                 showMessage('¡Bienvenido!', 'Por favor, inicia sesión o regístrate para empezar a usar el punto de venta y guardar tus ventas.');
             } else if (!isAuthReady) {
                  // Esto cubre el caso de que firebaseConfig sea inválido o haya un problema mayor
@@ -1241,3 +1305,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
