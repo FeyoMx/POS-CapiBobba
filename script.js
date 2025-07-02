@@ -1,14 +1,17 @@
 // Importa solo los módulos de Firestore que necesita este script
 // Los módulos de Firebase app y auth ya están inicializados en index.html
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Importa los módulos de autenticación de Firebase
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
 
 // Accede a las instancias globales de Firebase que se inicializaron en index.html
-// Es crucial que window.firebaseApp, window.db, window.auth, window.currentUserId y window.appId
-// estén disponibles globalmente y sean verificados.
-const db = window.db; // Reasignar para un uso más conciso
-let currentUserId = window.currentUserId; // Se actualizará al estar listo Firebase Auth
-let isAuthReady = window.isAuthReady; // Bandera del estado de autenticación de Firebase
-const appId = window.appId; // ID de la aplicación para estructurar Firestore
+const db = window.db;
+const auth = window.auth; // Acceder a la instancia de auth
+let currentUserId = window.currentUserId;
+let currentUserEmail = window.currentUserEmail; // Nuevo: para almacenar el email
+let isAuthReady = window.isAuthReady;
+const appId = window.appId;
 
 // --- IMPORTANTE: CONFIGURACIÓN DE SEGURIDAD EN FIRESTORE ---
 // Recuerda que tu API Key está expuesta en el cliente.
@@ -32,13 +35,13 @@ service cloud.firestore {
 
 
 // In-memory data storage for the POS system
-let menuItems = []; // All available products (drinks and toppings)
-let availableToppings = []; // Separate array for toppings
-let currentTransaction = []; // Items currently in the transaction
-let dailySales = []; // Completed sales for the day (now synced with Firestore)
-let editingSaleDocId = null; // Stores the Firestore document ID of the sale being edited
+let menuItems = [];
+let availableToppings = [];
+let currentTransaction = [];
+let dailySales = [];
+let editingSaleDocId = null;
 
-let currentDrinkBeingCustomized = null; // Stores the drink object while toppings are being selected
+let currentDrinkBeingCustomized = null;
 
 // DOM Elements
 const menuGrid = document.getElementById('menuGrid');
@@ -80,13 +83,28 @@ const endDateInput = document.getElementById('endDateInput');
 const applyFilterButton = document.getElementById('applyFilterButton');
 const clearFilterButton = document.getElementById('clearFilterButton');
 
-let isFilterEnabled = false; // Controls if the date filter is active
+let isFilterEnabled = false;
 
 // Report Elements
 const dailyReportButton = document.getElementById('dailyReportButton');
 const weeklyReportButton = document.getElementById('weeklyReportButton');
 const monthlyReportButton = document.getElementById('monthlyReportButton');
 const reportContent = document.getElementById('reportContent');
+
+// --- NUEVOS ELEMENTOS DOM para Autenticación ---
+const userStatusElement = document.getElementById('userStatus');
+const authButton = document.getElementById('authButton');
+const authModalOverlay = document.getElementById('authModalOverlay');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+const loginEmailInput = document.getElementById('loginEmail');
+const loginPasswordInput = document.getElementById('loginPassword');
+const registerEmailInput = document.getElementById('registerEmail');
+const registerPasswordInput = document.getElementById('registerPassword');
+const showLoginTabButton = document.getElementById('showLoginTab');
+const showRegisterTabButton = document.getElementById('showRegisterTab');
+const closeAuthModalButton = document.getElementById('closeAuthModal');
+
 
 // --- Funciones de Utilidad para Accesibilidad ---
 
@@ -101,12 +119,11 @@ function trapFocus(element) {
     const firstFocusableEl = focusableEls[0];
     const lastFocusableEl = focusableEls[focusableEls.length - 1];
 
-    if (!firstFocusableEl) return; // No focusable elements in modal
+    if (!firstFocusableEl) return;
 
-    // Set initial focus to the first focusable element
     setTimeout(() => {
         firstFocusableEl.focus();
-    }, 100); // Small delay to ensure modal is rendered and focusable
+    }, 100);
 
     element.addEventListener('keydown', function(e) {
         const isTabPressed = (e.key === 'Tab' || e.keyCode === 9);
@@ -129,7 +146,7 @@ function trapFocus(element) {
     });
 }
 
-let lastFocusedElement = null; // Stores the element that had focus before a modal opened
+let lastFocusedElement = null;
 
 /**
  * Displays a custom modal message to the user.
@@ -137,7 +154,7 @@ let lastFocusedElement = null; // Stores the element that had focus before a mod
  * @param {string} message The content of the message.
  */
 function showMessage(title, message) {
-    lastFocusedElement = document.activeElement; // Save the currently focused element
+    lastFocusedElement = document.activeElement;
     modalTitle.textContent = title;
     modalMessage.textContent = message;
     messageModalOverlay.classList.add('show');
@@ -150,12 +167,12 @@ function showMessage(title, message) {
 function hideMessage() {
     messageModalOverlay.classList.remove('show');
     if (lastFocusedElement) {
-        lastFocusedElement.focus(); // Restore focus to the element that opened the modal
+        lastFocusedElement.focus();
         lastFocusedElement = null;
     }
 }
 
-let onConfirmCallback = null; // Stores the callback function for the confirmation modal
+let onConfirmCallback = null;
 
 /**
  * Displays a custom confirmation modal to the user.
@@ -164,7 +181,7 @@ let onConfirmCallback = null; // Stores the callback function for the confirmati
  * @param {function} callback The function to execute if the user confirms.
  */
 function showConfirm(title, message, callback) {
-    lastFocusedElement = document.activeElement; // Save the currently focused element
+    lastFocusedElement = document.activeElement;
     confirmTitle.textContent = title;
     confirmMessage.textContent = message;
     onConfirmCallback = callback;
@@ -177,9 +194,9 @@ function showConfirm(title, message, callback) {
  */
 function hideConfirm() {
     confirmModalOverlay.classList.remove('show');
-    onConfirmCallback = null; // Clear the callback
+    onConfirmCallback = null;
     if (lastFocusedElement) {
-        lastFocusedElement.focus(); // Restore focus
+        lastFocusedElement.focus();
         lastFocusedElement = null;
     }
 }
@@ -188,12 +205,54 @@ function hideConfirm() {
  * Closes the topping selection modal and discards any current customization.
  */
 function cancelToppingSelection() {
-    currentDrinkBeingCustomized = null; // Discard current selection
-    toppingSelectionOverlay.classList.remove('show'); // Hide modal
+    currentDrinkBeingCustomized = null;
+    toppingSelectionOverlay.classList.remove('show');
     if (lastFocusedElement) {
-        lastFocusedElement.focus(); // Restore focus
+        lastFocusedElement.focus();
         lastFocusedElement = null;
     }
+}
+
+/**
+ * Opens the authentication modal.
+ */
+function openAuthModal() {
+    lastFocusedElement = document.activeElement;
+    authModalOverlay.classList.add('show');
+    trapFocus(authModalOverlay.querySelector('.modal-content'));
+}
+
+/**
+ * Closes the authentication modal.
+ */
+function closeAuthModal() {
+    authModalOverlay.classList.remove('show');
+    if (lastFocusedElement) {
+        lastFocusedElement.focus();
+        lastFocusedElement = null;
+    }
+}
+
+/**
+ * Switches the active tab in the authentication modal to login.
+ */
+function showLoginTab() {
+    loginForm.classList.remove('hidden');
+    registerForm.classList.add('hidden');
+    showLoginTabButton.classList.add('active');
+    showRegisterTabButton.classList.remove('active');
+    loginEmailInput.focus(); // Set focus to email input
+}
+
+/**
+ * Switches the active tab in the authentication modal to register.
+ */
+function showRegisterTab() {
+    registerForm.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+    showRegisterTabButton.classList.add('active');
+    showLoginTabButton.classList.remove('active');
+    registerEmailInput.focus(); // Set focus to email input
 }
 
 
@@ -249,24 +308,23 @@ function initializeData() {
  * Renders all menu items (drinks) in the menu grid.
  */
 function renderMenu() {
-    menuGrid.innerHTML = ''; // Clear existing items
+    menuGrid.innerHTML = '';
     menuItems.forEach(item => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = `menu-item ${item.type}`; // Add type class for specific styling
+        itemDiv.className = `menu-item ${item.type}`;
         itemDiv.dataset.itemId = item.id;
-        itemDiv.tabIndex = 0; // Make it focusable for accessibility
-        itemDiv.setAttribute('role', 'button'); // Indicate it's a button
-        itemDiv.setAttribute('aria-label', `Seleccionar ${item.name} por $${item.price.toFixed(2)}`); // Description for screen readers
+        itemDiv.tabIndex = 0;
+        itemDiv.setAttribute('role', 'button');
+        itemDiv.setAttribute('aria-label', `Seleccionar ${item.name} por $${item.price.toFixed(2)}`);
 
         itemDiv.innerHTML = `
             <span class="item-name">${item.name}</span>
             <span class="item-price">$${item.price.toFixed(2)}</span>
         `;
-        // When a menu item is clicked or Enter/Space is pressed
         itemDiv.addEventListener('click', () => openToppingSelectionModal(item));
         itemDiv.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault(); // Prevent page scroll with Spacebar
+                e.preventDefault();
                 openToppingSelectionModal(item);
             }
         });
@@ -278,13 +336,12 @@ function renderMenu() {
  * Updates the transaction list and total display in the UI.
  */
 function updateTransactionDisplay() {
-    transactionList.innerHTML = ''; // Clear existing items
+    transactionList.innerHTML = '';
     let total = 0;
 
     if (currentTransaction.length === 0) {
         transactionList.innerHTML = '<li role="listitem" style="text-align: center; color: var(--text-gray);">¡Añade productos para empezar!</li>';
     } else {
-        // Iterate directly over currentTransaction as it now holds grouped items with quantities
         currentTransaction.forEach(item => {
             const li = document.createElement('li');
             li.className = 'transaction-item';
@@ -300,7 +357,6 @@ function updateTransactionDisplay() {
             const itemSubtotal = (item.price + toppingsPrice) * item.quantity;
             total += itemSubtotal;
 
-            // The data-item-key for removal should be the unique transactionLineId
             li.innerHTML = `
                 <div class="item-info">
                     <span class="item-qty-name">${item.quantity}x ${item.name}</span>
@@ -315,7 +371,6 @@ function updateTransactionDisplay() {
 
     transactionTotalElement.textContent = `Total: $${total.toFixed(2)}`;
 
-    // Update button text based on editing mode
     if (editingSaleDocId) {
         completeSaleButton.textContent = 'Actualizar Venta ✅';
         clearTransactionButton.textContent = 'Cancelar Edición ❌';
@@ -324,12 +379,10 @@ function updateTransactionDisplay() {
         clearTransactionButton.textContent = 'Vaciar Transacción 🗑️';
     }
 
-
-    // Add event listeners for remove buttons
     transactionList.querySelectorAll('.remove-item-btn').forEach(button => {
         button.addEventListener('click', (event) => {
             const transactionLineIdToRemove = event.target.dataset.transactionLineId;
-            decrementItemQuantity(transactionLineIdToRemove); // Call decrement function
+            decrementItemQuantity(transactionLineIdToRemove);
         });
     });
 }
@@ -339,13 +392,12 @@ function updateTransactionDisplay() {
  * @param {Array} salesToRender Optional array of sales to render. Defaults to `dailySales`.
  */
 function renderDailySales(salesToRender = dailySales) {
-    dailySalesList.innerHTML = ''; // Clear existing sales
+    dailySalesList.innerHTML = '';
     if (salesToRender.length === 0) {
         dailySalesList.innerHTML = '<li role="listitem" style="text-align: center; color: var(--text-gray);">No hay ventas registradas hoy.</li>';
         return;
     }
 
-    // Sort sales by timestamp in descending order (most recent first)
     const sortedSales = [...salesToRender].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     sortedSales.forEach((sale, index) => {
@@ -355,7 +407,7 @@ function renderDailySales(salesToRender = dailySales) {
 
         const saleDate = new Date(sale.timestamp).toLocaleString();
         let saleDetailsHtml = '<ul role="list">';
-        sale.items.forEach(item => { // items here are already grouped with quantities
+        sale.items.forEach(item => {
             let toppingsDetail = '';
             let toppingsPrice = 0;
             if (item.toppings && item.toppings.length > 0) {
@@ -366,13 +418,17 @@ function renderDailySales(salesToRender = dailySales) {
         });
         saleDetailsHtml += '</ul>';
 
+        // Display who made the sale if available
+        const recordedBy = sale.userEmail ? `Registrado por: ${sale.userEmail}` : '';
+
         saleItemDiv.innerHTML = `
             <div class="sale-header">
-                <span>Venta #${sortedSales.length - index}</span> <!-- Display sale number in ascending order -->
+                <span>Venta #${sortedSales.length - index}</span>
                 <span>${saleDate}</span>
             </div>
             <div class="sale-details">
                 ${saleDetailsHtml}
+                ${recordedBy ? `<p class="sale-recorded-by">${recordedBy}</p>` : ''}
             </div>
             <div class="sale-total">Total Venta: $${sale.total.toFixed(2)}</div>
             <div class="sale-actions" role="group" aria-label="Acciones para la venta">
@@ -383,7 +439,6 @@ function renderDailySales(salesToRender = dailySales) {
         dailySalesList.appendChild(saleItemDiv);
     });
 
-    // Add event listeners for new edit/delete buttons
     dailySalesList.querySelectorAll('.sale-action-btn.edit').forEach(button => {
         button.addEventListener('click', (event) => {
             editSale(event.target.dataset.saleId);
@@ -391,7 +446,6 @@ function renderDailySales(salesToRender = dailySales) {
     });
     dailySalesList.querySelectorAll('.sale-action-btn.delete').forEach(button => {
         button.addEventListener('click', (event) => {
-            // Use confirmation modal for deletion
             const saleIdToDelete = event.target.dataset.saleId;
             showConfirm('Confirmar Eliminación', '¿Estás seguro de que quieres eliminar esta venta del historial?', () => {
                 deleteSale(saleIdToDelete);
@@ -412,7 +466,7 @@ function calculateToppingModalTotalPrice() {
     let basePrice = currentDrinkBeingCustomized.price;
     let toppingsPrice = currentDrinkBeingCustomized.selectedToppings.reduce((sum, t) => sum + t.price, 0);
     let quantity = parseInt(drinkQuantityInput.value, 10);
-    if (isNaN(quantity) || quantity < 1) quantity = 1; // Default to 1 if invalid
+    if (isNaN(quantity) || quantity < 1) quantity = 1;
 
     return (basePrice + toppingsPrice) * quantity;
 }
@@ -431,41 +485,37 @@ function updateToppingModalTotalPriceDisplay() {
  * @param {object} drinkItem The drink object to customize.
  */
 function openToppingSelectionModal(drinkItem) {
-    lastFocusedElement = document.activeElement; // Save the element that opened the modal
+    lastFocusedElement = document.activeElement;
 
-    // Initialize currentDrinkBeingCustomized with the base drink and default quantity
     currentDrinkBeingCustomized = {
         ...drinkItem,
-        selectedToppings: [], // Toppings selected in the modal
-        quantity: 1 // Default quantity
+        selectedToppings: [],
+        quantity: 1
     };
 
     toppingDrinkNameElement.textContent = drinkItem.name;
-    toppingsModalGrid.innerHTML = ''; // Clear previous toppings
-    drinkQuantityInput.value = 1; // Reset quantity input
+    toppingsModalGrid.innerHTML = '';
+    drinkQuantityInput.value = 1;
 
-    // Populate toppings in the modal
     availableToppings.forEach(topping => {
         const toppingItemDiv = document.createElement('div');
         toppingItemDiv.className = 'topping-modal-item';
-        toppingItemDiv.dataset.toppingId = topping.id; // Use ID for easier lookup
+        toppingItemDiv.dataset.toppingId = topping.id;
         toppingItemDiv.dataset.toppingName = topping.name;
         toppingItemDiv.dataset.toppingPrice = topping.price;
-        toppingItemDiv.tabIndex = 0; // Make it focusable
-        toppingItemDiv.setAttribute('role', 'option'); // Role for accessibility
+        toppingItemDiv.tabIndex = 0;
+        toppingItemDiv.setAttribute('role', 'option');
 
         toppingItemDiv.innerHTML = `
             <span class="topping-modal-name">${topping.name}</span>
             <span class="topping-modal-price">+$${topping.price.toFixed(2)}</span>
             <button class="add-topping-button" data-action="add" aria-label="Añadir topping ${topping.name}">Añadir ✨</button>
         `;
-        // Event listener to toggle topping selection
         toppingItemDiv.addEventListener('click', function(event) {
-            // Prevent button click from triggering item click if clicked directly on button
             if (event.target.tagName === 'BUTTON') {
                 return;
             }
-            this.querySelector('.add-topping-button').click(); // Simulate a click on the button to toggle state
+            this.querySelector('.add-topping-button').click();
         });
         toppingItemDiv.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -476,7 +526,6 @@ function openToppingSelectionModal(drinkItem) {
         toppingsModalGrid.appendChild(toppingItemDiv);
     });
 
-    // Attach event listeners for topping buttons in the modal
     toppingsModalGrid.querySelectorAll('.add-topping-button').forEach(button => {
         button.addEventListener('click', function() {
             const toppingItemDiv = this.closest('.topping-modal-item');
@@ -486,26 +535,26 @@ function openToppingSelectionModal(drinkItem) {
 
             const existingToppingIndex = currentDrinkBeingCustomized.selectedToppings.findIndex(t => t.id === toppingId);
 
-            if (existingToppingIndex === -1) { // Topping not selected, add it
+            if (existingToppingIndex === -1) {
                 currentDrinkBeingCustomized.selectedToppings.push({ id: toppingId, name: toppingName, price: toppingPrice });
                 toppingItemDiv.classList.add('selected');
                 this.textContent = 'Quitar ➖';
                 this.dataset.action = 'remove';
                 this.classList.add('remove');
-                this.setAttribute('aria-label', `Quitar topping ${toppingName}`); // Update aria-label
-            } else { // Topping already selected, remove it
+                this.setAttribute('aria-label', `Quitar topping ${toppingName}`);
+            } else {
                 currentDrinkBeingCustomized.selectedToppings.splice(existingToppingIndex, 1);
                 toppingItemDiv.classList.remove('selected');
                 this.textContent = 'Añadir ✨';
                 this.dataset.action = 'add';
                 this.classList.remove('remove');
-                this.setAttribute('aria-label', `Añadir topping ${toppingName}`); // Update aria-label
+                this.setAttribute('aria-label', `Añadir topping ${toppingName}`);
             }
-            updateToppingModalTotalPriceDisplay(); // Update price when toppings change
+            updateToppingModalTotalPriceDisplay();
         });
     });
 
-    updateToppingModalTotalPriceDisplay(); // Initial price display
+    updateToppingModalTotalPriceDisplay();
     toppingSelectionOverlay.classList.add('show');
     trapFocus(toppingSelectionOverlay.querySelector('.topping-selection-content'));
 }
@@ -521,39 +570,33 @@ function addCustomizedDrinkToTransaction() {
             return;
         }
 
-        // Update the quantity in the currentDrinkBeingCustomized object
         currentDrinkBeingCustomized.quantity = quantity;
 
-        // Create a unique key for this specific drink + toppings combination
         const toppingIds = currentDrinkBeingCustomized.selectedToppings.map(t => t.id).sort().join(',');
         const uniqueKey = `${currentDrinkBeingCustomized.id}-${toppingIds}`;
 
-        // Check if an identical item (same drink, same toppings) already exists in the transaction
         const existingTransactionItemIndex = currentTransaction.findIndex(item => {
             const existingToppingIds = item.toppings ? item.toppings.map(t => t.id).sort().join(',') : '';
             return item.id === currentDrinkBeingCustomized.id && existingToppingIds === toppingIds;
         });
 
         if (existingTransactionItemIndex > -1) {
-            // If it exists, just update its quantity
             currentTransaction[existingTransactionItemIndex].quantity += quantity;
         } else {
-            // If it's a new combination, add it as a new line item
             const transactionItem = {
                 ...currentDrinkBeingCustomized,
-                toppings: [...currentDrinkBeingCustomized.selectedToppings], // Deep copy toppings
-                transactionLineId: uniqueKey // Use this as the unique ID for the line item
+                toppings: [...currentDrinkBeingCustomized.selectedToppings],
+                transactionLineId: uniqueKey
             };
-            delete transactionItem.selectedToppings; // Clean up temp property
+            delete transactionItem.selectedToppings;
             currentTransaction.push(transactionItem);
         }
         
-        // Show message BEFORE clearing currentDrinkBeingCustomized
         showMessage('Producto Añadido', `Se añadieron ${quantity}x ${currentDrinkBeingCustomized.name} a la transacción.`);
 
-        currentDrinkBeingCustomized = null; // Clear the temporary drink
-        toppingSelectionOverlay.classList.remove('show'); // Hide modal
-        if (lastFocusedElement) lastFocusedElement.focus(); // Restore focus
+        currentDrinkBeingCustomized = null;
+        toppingSelectionOverlay.classList.remove('show');
+        if (lastFocusedElement) lastFocusedElement.focus();
         updateTransactionDisplay();
     }
 }
@@ -571,7 +614,7 @@ function decrementItemQuantity(transactionLineId) {
             showMessage('Cantidad Actualizada', `Cantidad de ${currentTransaction[itemIndex].name} reducida.`);
         } else {
             const removedItemName = currentTransaction[itemIndex].name;
-            currentTransaction.splice(itemIndex, 1); // Remove the item if quantity is 1
+            currentTransaction.splice(itemIndex, 1);
             showMessage('Producto Eliminado', `${removedItemName} ha sido eliminado de la transacción.`);
         }
         updateTransactionDisplay();
@@ -589,9 +632,9 @@ async function completeSale() {
         return;
     }
 
-    // Ensure Firebase is ready and a valid User ID is available
+    // Asegurarse de que Firebase esté listo y haya un User ID VÁLIDO
     if (!window.isAuthReady || !window.db || !window.currentUserId) {
-        console.error("Firebase: DB or User ID not ready or authentication failed.", { isAuthReady: window.isAuthReady, db: window.db, currentUserId: window.currentUserId });
+        console.error("Firebase: DB o User ID no están listos o la autenticación falló.", { isAuthReady: window.isAuthReady, db: window.db, currentUserId: window.currentUserId });
         
         let errorMessage = 'Firebase no está listo o el ID de usuario no está disponible.';
         if (!window.isAuthReady) {
@@ -603,42 +646,41 @@ async function completeSale() {
         return;
     }
 
+    console.log("Attempting to save sale. Current User ID:", window.currentUserId, "Email:", window.currentUserEmail); // LOG DE DEPURACIÓN
+
     const total = parseFloat(transactionTotalElement.textContent.replace('Total: $', ''));
 
-    // The items in currentTransaction are already grouped with quantities, so just copy them
     const saleData = {
         timestamp: new Date().toISOString(),
-        items: JSON.parse(JSON.stringify(currentTransaction)), // Deep copy of items
-        total: total
+        items: JSON.parse(JSON.stringify(currentTransaction)),
+        total: total,
+        userId: window.currentUserId, // Guardar el UID del usuario que realizó la compra
+        userEmail: window.currentUserEmail // Guardar el email del usuario (o 'Anónimo')
     };
 
     try {
         const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`);
 
         if (editingSaleDocId) {
-            // Update existing document
             const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
-            await setDoc(saleDocRef, saleData, { merge: false }); // Overwrite the entire document
+            await setDoc(saleDocRef, saleData, { merge: false });
             console.log("Document updated with ID: ", editingSaleDocId);
             showMessage('Venta Actualizada', `Venta por $${total.toFixed(2)} actualizada con éxito en la base de datos.`);
-            editingSaleDocId = null; // Exit editing mode
+            editingSaleDocId = null;
         } else {
-            // Add new document
             const docRef = await addDoc(salesCollectionRef, saleData);
             console.log("Document written with ID: ", docRef.id);
             showMessage('Venta Registrada', `Venta por $${total.toFixed(2)} registrada con éxito en la base de datos.`);
         }
         
-        currentTransaction = []; // Clear current transaction locally
-        updateTransactionDisplay(); // This will also reset button text
-        // renderDailySales will be triggered by onSnapshot listener
+        currentTransaction = [];
+        updateTransactionDisplay();
     } catch (error) {
         console.error("Error saving document to Firestore: ", error);
-        // More specific error message if it's a 'permission-denied' error
         if (error.code === 'permission-denied') {
             showMessage('Error de Permisos', 'No tienes permisos para realizar esta operación. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
         } else {
-            showMessage('Error al Guardar Venta', `Hubo un problema al guardar la venta: ${error.message}. Por favor, revisa la consola para más detalles.`);
+            showMessage('Error al Guardar Venta', `Hubo un problema al guardar la venta: ${error.message}.`);
         }
     }
 }
@@ -654,8 +696,8 @@ function clearTransaction() {
 
     showConfirm('Confirmar Vaciado', '¿Estás seguro de que quieres vaciar la transacción actual?', () => {
         currentTransaction = [];
-        editingSaleDocId = null; // Exit editing mode
-        updateTransactionDisplay(); // This will reset button text
+        editingSaleDocId = null;
+        updateTransactionDisplay();
         showMessage('Transacción Vaciada', 'Todos los productos han sido eliminados de la transacción.');
     });
 }
@@ -677,7 +719,6 @@ async function deleteSale(saleId) {
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);
         showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
-        // onSnapshot will automatically re-render dailySalesList
     } catch (error) {
         console.error("Error removing document: ", error);
         if (error.code === 'permission-denied') {
@@ -695,9 +736,9 @@ async function deleteSale(saleId) {
 function editSale(saleId) {
     const saleToEdit = dailySales.find(sale => sale.id === saleId);
     if (saleToEdit) {
-        currentTransaction = JSON.parse(JSON.stringify(saleToEdit.items)); // Deep copy items
-        editingSaleDocId = saleId; // Set editing mode
-        updateTransactionDisplay(); // Update UI and button text
+        currentTransaction = JSON.parse(JSON.stringify(saleToEdit.items));
+        editingSaleDocId = saleId;
+        updateTransactionDisplay();
         showMessage('Modo Edición', `Editando venta #${dailySales.findIndex(s => s.id === saleId) + 1}. Realiza cambios y haz clic en "Actualizar Venta".`);
     } else {
         showMessage('Venta No Encontrada', 'No se pudo encontrar la venta para editar.');
@@ -710,7 +751,6 @@ function editSale(saleId) {
  */
 function applySalesFilter() {
     if (!isFilterEnabled) {
-        // If filter is disabled, just ensure all sales are rendered
         renderDailySales(dailySales); 
         return;
     }
@@ -720,22 +760,20 @@ function applySalesFilter() {
 
     if (!startDateStr && !endDateStr) {
         showMessage('Filtro Vacío', 'Por favor, selecciona al menos una fecha para filtrar.');
-        renderDailySales(dailySales); // Show all if filter is empty
+        renderDailySales(dailySales);
         return;
     }
 
-    let filtered = [...dailySales]; // Start with all sales
+    let filtered = [...dailySales];
 
     if (startDateStr) {
         const startDate = new Date(startDateStr);
-        // Set to start of the day to include all sales on that day
         startDate.setHours(0, 0, 0, 0); 
         filtered = filtered.filter(sale => new Date(sale.timestamp) >= startDate);
     }
 
     if (endDateStr) {
         const endDate = new Date(endDateStr);
-        // Set to end of the day to include all sales on that day
         endDate.setHours(23, 59, 59, 999); 
         filtered = filtered.filter(sale => new Date(sale.timestamp) <= endDate);
     }
@@ -754,7 +792,6 @@ function applySalesFilter() {
 function clearSalesFilter() {
     startDateInput.value = '';
     endDateInput.value = '';
-    // Always render all sales when clearing filter, regardless of toggle state
     renderDailySales(dailySales); 
     showMessage('Filtro Limpiado', 'Se muestran todas las ventas.');
 }
@@ -776,7 +813,7 @@ function sendWhatsAppConfirmation() {
 
     currentTransaction.forEach(item => {
         let toppingsDetail = '';
-        let itemTotalPricePerUnit = item.price; // Price of one unit of the drink
+        let itemTotalPricePerUnit = item.price;
         if (item.toppings && item.toppings.length > 0) {
             toppingsDetail = ` con ${item.toppings.map(t => t.name).join(', ')}`;
             itemTotalPricePerUnit += item.toppings.reduce((sum, t) => sum + t.price, 0);
@@ -838,7 +875,7 @@ function getMondayOfWeek(date) {
  * @returns {Array<object>} An array of objects with `period` (date) and `total`.
  */
 function generateDailyReport() {
-    const dailyTotals = new Map(); // Map<YYYY-MM-DD, total>
+    const dailyTotals = new Map();
 
     dailySales.forEach(sale => {
         const saleDate = formatDate(sale.timestamp);
@@ -851,7 +888,6 @@ function generateDailyReport() {
         total: total
     }));
 
-    // Sort by date ascending for report display
     report.sort((a, b) => new Date(a.period) - new Date(b.period));
     return report;
 }
@@ -861,11 +897,11 @@ function generateDailyReport() {
  * @returns {Array<object>} An array of objects with `period` (week start date) and `total`.
  */
 function generateWeeklyReport() {
-    const weeklyTotals = new Map(); // Map<YYYY-MM-DD (Monday), total>
+    const weeklyTotals = new Map();
 
     dailySales.forEach(sale => {
         const mondayOfWeek = getMondayOfWeek(sale.timestamp);
-        const weekKey = formatDate(mondayOfWeek); // Use Monday's date as key for the week
+        const weekKey = formatDate(mondayOfWeek);
         const currentTotal = weeklyTotals.get(weekKey) || 0;
         weeklyTotals.set(weekKey, currentTotal + sale.total);
     });
@@ -875,7 +911,6 @@ function generateWeeklyReport() {
         total: total
     }));
 
-    // Sort by week start date ascending
     report.sort((a, b) => new Date(a.period.replace('Semana del ', '')) - new Date(b.period.replace('Semana del ', '')));
     return report;
 }
@@ -885,7 +920,7 @@ function generateWeeklyReport() {
  * @returns {Array<object>} An array of objects with `period` (month) and `total`.
  */
 function generateMonthlyReport() {
-    const monthlyTotals = new Map(); // Map<YYYY-MM, total>
+    const monthlyTotals = new Map();
 
     dailySales.forEach(sale => {
         const d = new Date(sale.timestamp);
@@ -899,7 +934,6 @@ function generateMonthlyReport() {
         total: total
     }));
 
-    // Sort by month ascending
     report.sort((a, b) => a.period.localeCompare(b.period));
     return report;
 }
@@ -949,6 +983,82 @@ function renderReport(reportType) {
 }
 
 
+// --- Funciones de Autenticación (NUEVO) ---
+
+/**
+ * Handles user login with email and password.
+ * @param {Event} event The form submission event.
+ */
+async function handleLogin(event) {
+    event.preventDefault();
+    const email = loginEmailInput.value;
+    const password = loginPasswordInput.value;
+
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showMessage('Inicio de Sesión Exitoso', `Bienvenido de nuevo, ${email}!`);
+        closeAuthModal();
+    } catch (error) {
+        console.error("Error al iniciar sesión:", error);
+        let errorMessage = "Error al iniciar sesión. Por favor, verifica tus credenciales.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            errorMessage = "Correo electrónico o contraseña incorrectos.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "El formato del correo electrónico es inválido.";
+        }
+        showMessage('Error de Inicio de Sesión', errorMessage);
+    }
+}
+
+/**
+ * Handles user registration with email and password.
+ * @param {Event} event The form submission event.
+ */
+async function handleRegister(event) {
+    event.preventDefault();
+    const email = registerEmailInput.value;
+    const password = registerPasswordInput.value;
+
+    if (password.length < 6) {
+        showMessage('Contraseña Débil', 'La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
+
+    try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        showMessage('Registro Exitoso', `Cuenta creada para ${email}! Has iniciado sesión automáticamente.`);
+        closeAuthModal();
+    } catch (error) {
+        console.error("Error al registrar usuario:", error);
+        let errorMessage = "Error al registrarse.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "Este correo electrónico ya está registrado.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "El formato del correo electrónico es inválido.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "La contraseña es demasiado débil. Debe tener al menos 6 caracteres.";
+        }
+        showMessage('Error de Registro', errorMessage);
+    }
+}
+
+/**
+ * Handles user logout.
+ */
+async function handleLogout() {
+    showConfirm('Cerrar Sesión', '¿Estás seguro de que quieres cerrar tu sesión?', async () => {
+        try {
+            await signOut(auth);
+            showMessage('Sesión Cerrada', 'Has cerrado sesión correctamente.');
+            // onAuthStateChanged se encargará de actualizar la UI
+        } catch (error) {
+            console.error("Error al cerrar sesión:", error);
+            showMessage('Error al Cerrar Sesión', `Hubo un problema al cerrar sesión: ${error.message}.`);
+        }
+    });
+}
+
+
 // --- Event Listeners ---
 completeSaleButton.addEventListener('click', completeSale);
 clearTransactionButton.addEventListener('click', clearTransaction);
@@ -968,7 +1078,6 @@ confirmNoButton.addEventListener('click', hideConfirm);
 // Topping Modal Event Listeners
 confirmToppingsButton.addEventListener('click', addCustomizedDrinkToTransaction);
 noToppingsButton.addEventListener('click', function() {
-    // If "No Toppings" is clicked, ensure selectedToppings is empty and add to transaction
     if (currentDrinkBeingCustomized) {
         currentDrinkBeingCustomized.selectedToppings = [];
         addCustomizedDrinkToTransaction();
@@ -981,30 +1090,28 @@ decrementQuantityButton.addEventListener('click', () => {
     let quantity = parseInt(drinkQuantityInput.value, 10);
     if (quantity > 1) {
         drinkQuantityInput.value = quantity - 1;
-        updateToppingModalTotalPriceDisplay(); // Update price when quantity changes
+        updateToppingModalTotalPriceDisplay();
     }
 });
 
 incrementQuantityButton.addEventListener('click', () => {
     let quantity = parseInt(drinkQuantityInput.value, 10);
     drinkQuantityInput.value = quantity + 1;
-    updateToppingModalTotalPriceDisplay(); // Update price when quantity changes
+    updateToppingModalTotalPriceDisplay();
 });
 
-// Ensure quantity input is always at least 1 and updates price
 drinkQuantityInput.addEventListener('change', () => {
     let quantity = parseInt(drinkQuantityInput.value, 10);
     if (isNaN(quantity) || quantity < 1) {
         drinkQuantityInput.value = 1;
     }
-    updateToppingModalTotalPriceDisplay(); // Update price when input changes
+    updateToppingModalTotalPriceDisplay();
 });
 
 // Filter Event Listeners
 applyFilterButton.addEventListener('click', applySalesFilter);
 clearFilterButton.addEventListener('click', clearSalesFilter);
 
-// Toggle Filter Checkbox Event Listener
 toggleFilterCheckbox.addEventListener('change', () => {
     isFilterEnabled = toggleFilterCheckbox.checked;
     const switchLabel = toggleFilterCheckbox.closest('.switch');
@@ -1015,18 +1122,33 @@ toggleFilterCheckbox.addEventListener('change', () => {
     if (isFilterEnabled) {
         salesFilterControlsContainer.classList.remove('hidden');
         showMessage('Filtro Activado', 'Ahora puedes filtrar las ventas por fecha.');
-        applySalesFilter(); // Apply filter if there are dates, or show all if dates are empty
+        applySalesFilter();
     } else {
         salesFilterControlsContainer.classList.add('hidden');
-        clearSalesFilter(); // Clear filter inputs and show all sales
+        clearSalesFilter();
         showMessage('Filtro Desactivado', 'Se muestran todas las ventas.');
     }
 });
 
-// Report Buttons Event Listeners
 dailyReportButton.addEventListener('click', () => renderReport('daily'));
 weeklyReportButton.addEventListener('click', () => renderReport('weekly'));
 monthlyReportButton.addEventListener('click', () => renderReport('monthly'));
+
+// --- NUEVOS Event Listeners para Autenticación ---
+authButton.addEventListener('click', () => {
+    // Si el usuario está autenticado, el botón es para cerrar sesión
+    if (auth.currentUser) {
+        handleLogout();
+    } else {
+        // Si no está autenticado, el botón es para iniciar sesión/registrarse
+        openAuthModal();
+    }
+});
+closeAuthModalButton.addEventListener('click', closeAuthModal);
+showLoginTabButton.addEventListener('click', showLoginTab);
+showRegisterTabButton.addEventListener('click', showRegisterTab);
+loginForm.addEventListener('submit', handleLogin);
+registerForm.addEventListener('submit', handleRegister);
 
 
 // --- Initial Setup ---
@@ -1035,35 +1157,43 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMenu();
     updateTransactionDisplay();
     
-    // Listen for the custom event indicating Firebase Auth is ready
+    // Escuchar el evento personalizado que indica que Firebase Auth está listo
     document.addEventListener('firebaseAuthReady', () => {
-        // Update currentUserId from the global variable set by the Firebase script
+        // Actualizar las variables locales con los valores globales una vez que estén disponibles
         currentUserId = window.currentUserId;
+        currentUserEmail = window.currentUserEmail; // Actualizar el email
         isAuthReady = window.isAuthReady;
+
+        // Actualizar el estado del usuario en la UI
+        if (currentUserEmail) {
+            userStatusElement.textContent = `Sesión iniciada como: ${currentUserEmail}`;
+            authButton.textContent = 'Cerrar Sesión';
+        } else {
+            userStatusElement.textContent = 'No hay sesión iniciada';
+            authButton.textContent = 'Iniciar Sesión / Registrarse';
+        }
         
-        // Only proceed if Firebase is initialized, DB is available, and a valid user ID exists
-        if (isAuthReady && window.db && currentUserId && appId) { // Use window.db here
+        if (isAuthReady && window.db && currentUserId && appId) {
             console.log("POS Script: Firebase Auth está listo. Configurando listener de Firestore.");
             console.log("POS Script: ID de Usuario Actual:", currentUserId);
-            // Set up real-time listener for daily sales
+            
             const salesCollectionRef = collection(window.db, `artifacts/${appId}/users/${currentUserId}/dailySales`);
-            const q = query(salesCollectionRef, orderBy("timestamp", "desc")); // Order by timestamp descending
+            const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
 
             onSnapshot(q, (snapshot) => {
-                dailySales = []; // Clear current in-memory sales
+                dailySales = [];
                 snapshot.forEach((doc) => {
-                    dailySales.push({ id: doc.id, ...doc.data() }); // Store doc.id
+                    dailySales.push({ id: doc.id, ...doc.data() });
                 });
                 console.log("Firestore: Ventas diarias actualizadas.", dailySales);
-                // When data updates, re-render based on current filter state
+                
                 if (isFilterEnabled) {
-                    applySalesFilter(); // Re-apply filter if active
+                    applySalesFilter();
                 } else {
-                    renderDailySales(); // Show all if filter is disabled
+                    renderDailySales();
                 }
             }, (error) => {
                 console.error("Firestore: Error al obtener ventas diarias:", error);
-                // More specific error message if it's a 'permission-denied' error
                 if (error.code === 'permission-denied') {
                     showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
                 } else {
@@ -1072,10 +1202,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else {
             console.warn("POS Script: Firebase o ID de usuario no listos, no se puede configurar el listener de Firestore. Mostrando solo datos locales.");
-            renderDailySales(); // Render empty list or previous local data
-            // Show a message to the user if authentication failed at startup
-            if (!isAuthReady || !currentUserId) {
-                showMessage('Problema de Autenticación', 'No se pudo establecer la conexión con la base de datos. Las ventas no se guardarán. Por favor, recarga la página o verifica la configuración de autenticación anónima en Firebase.');
+            renderDailySales();
+            if (!isAuthReady) {
+                showMessage('Problema de Autenticación', 'No se pudo establecer la conexión con la base de datos. Las ventas no se guardarán. Por favor, recarga la página o verifica la configuración de autenticación en Firebase.');
             }
         }
     });
