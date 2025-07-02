@@ -21,7 +21,12 @@ const appId = window.appId;
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /artifacts/{appId}/users/{userId}/dailySales/{saleId} {
+    // NUEVA RUTA PARA VENTAS GLOBALES
+    match /artifacts/{appId}/public/dailySales/{saleId} {
+      allow read, write: if request.auth != null; // Cualquier usuario autenticado puede leer/escribir
+    }
+    // RUTA PARA DATOS PRIVADOS DE USUARIO (se mantiene si se necesita)
+    match /artifacts/{appId}/users/{userId}/{documents=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     match /{document=**} {
@@ -656,7 +661,8 @@ async function completeSale() {
     };
 
     try {
-        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`);
+        // CAMBIO CLAVE: Apuntar a la colección pública
+        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/public/dailySales`);
 
         if (editingSaleDocId) {
             const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
@@ -712,7 +718,8 @@ async function deleteSale(saleId) {
     }
 
     try {
-        const saleDocRef = doc(window.db, `artifacts/${window.appId}/users/${window.currentUserId}/dailySales`, saleId);
+        // CAMBIO CLAVE: Apuntar a la colección pública para eliminar
+        const saleDocRef = doc(window.db, `artifacts/${window.appId}/public/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);
         showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
@@ -731,6 +738,8 @@ async function deleteSale(saleId) {
  * @param {string} saleId The ID of the sale document to edit.
  */
 function editSale(saleId) {
+    // NOTA: Para editar una venta, la aplicación debe tener acceso a todas las ventas (globales).
+    // La lógica actual de `dailySales` ya contiene todas las ventas cargadas por el listener global.
     const saleToEdit = dailySales.find(sale => sale.id === saleId);
     if (saleToEdit) {
         currentTransaction = JSON.parse(JSON.stringify(saleToEdit.items));
@@ -980,7 +989,7 @@ function renderReport(reportType) {
 }
 
 
-// --- Funciones de Autenticación (NUEVO) ---
+// --- Funciones de Autenticación ---
 
 /**
  * Handles user login with email and password.
@@ -1047,8 +1056,7 @@ async function handleLogout() {
         try {
             await signOut(auth);
             showMessage('Sesión Cerrada', 'Has cerrado sesión correctamente.');
-            // onAuthStateChanged se encargará de actualizar la UI y, al no haber usuario,
-            // el listener de Firestore se desuscribirá y se mostrará el modal de auth.
+            // onAuthStateChanged se encargará de actualizar la UI
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
             showMessage('Error al Cerrar Sesión', `Hubo un problema al cerrar sesión: ${error.message}.`);
@@ -1132,13 +1140,11 @@ dailyReportButton.addEventListener('click', () => renderReport('daily'));
 weeklyReportButton.addEventListener('click', () => renderReport('weekly'));
 monthlyReportButton.addEventListener('click', () => renderReport('monthly'));
 
-// --- NUEVOS Event Listeners para Autenticación ---
+// --- Event Listeners para Autenticación ---
 authButton.addEventListener('click', () => {
-    // Si el usuario está autenticado, el botón es para cerrar sesión
-    if (auth.currentUser) {
+    if (auth.currentUser) { // Si hay un usuario logueado
         handleLogout();
-    } else {
-        // Si no está autenticado, el botón es para iniciar sesión/registrarse
+    } else { // Si no hay usuario logueado
         openAuthModal();
     }
 });
@@ -1186,7 +1192,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Firestore: Listener anterior desuscrito.");
             }
 
-            const salesCollectionRef = collection(window.db, `artifacts/${appId}/users/${currentUserId}/dailySales`);
+            // CAMBIO CLAVE: Apuntar a la colección pública para el listener
+            const salesCollectionRef = collection(window.db, `artifacts/${appId}/public/dailySales`);
             const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
 
             // Suscribirse al listener y guardar la función de desuscripción
@@ -1205,7 +1212,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }, (error) => {
                 console.error("Firestore: Error al obtener ventas diarias:", error);
                 if (error.code === 'permission-denied') {
-                    showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
+                    // Si hay un error de permisos, limpiar las ventas y mostrar un mensaje
+                    showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, inicia sesión con una cuenta válida.');
                     dailySales = []; // Limpiar ventas si hay error de permisos
                     renderDailySales(); // Renderizar lista vacía
                 } else {
@@ -1220,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Firestore: Listener desuscrito porque no hay usuario autenticado.");
             }
             dailySales = []; // Limpiar las ventas en memoria
-            renderDailySales(); // Renderizar la lista vacía
+            renderDailySales(); // Renderizar la lista vacía (vacía porque no hay datos de usuario)
 
             // Mostrar el modal de autenticación si no hay usuario autenticado al inicio
             if (isAuthReady && !currentUserId) { // isAuthReady es true si la verificación inicial terminó
@@ -1233,4 +1241,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
