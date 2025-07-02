@@ -1,8 +1,7 @@
 // Importa solo los módulos de Firestore que necesita este script
-// Los módulos de Firebase app y auth ya están inicializados en index.html
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // Importa los módulos de autenticación de Firebase
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 
 // Accede a las instancias globales de Firebase que se inicializaron en index.html
@@ -636,17 +635,15 @@ async function completeSale() {
     if (!window.isAuthReady || !window.db || !window.currentUserId) {
         console.error("Firebase: DB o User ID no están listos o la autenticación falló.", { isAuthReady: window.isAuthReady, db: window.db, currentUserId: window.currentUserId });
         
-        let errorMessage = 'Firebase no está listo o el ID de usuario no está disponible.';
+        let errorMessage = 'No hay una sesión de usuario activa. Por favor, inicia sesión o regístrate para guardar ventas.';
         if (!window.isAuthReady) {
             errorMessage = 'La inicialización de Firebase no ha finalizado. Por favor, espera un momento o recarga la página.';
-        } else if (!window.currentUserId) {
-            errorMessage = 'No se pudo autenticar al usuario. La persistencia de datos no funcionará. Por favor, recarga la página o verifica tu conexión.';
         }
         showMessage('Error de Autenticación', errorMessage);
         return;
     }
 
-    console.log("Attempting to save sale. Current User ID:", window.currentUserId, "Email:", window.currentUserEmail); // LOG DE DEPURACIÓN
+    console.log("Attempting to save sale. Current User ID:", window.currentUserId, "Email:", window.currentUserEmail);
 
     const total = parseFloat(transactionTotalElement.textContent.replace('Total: $', ''));
 
@@ -655,7 +652,7 @@ async function completeSale() {
         items: JSON.parse(JSON.stringify(currentTransaction)),
         total: total,
         userId: window.currentUserId, // Guardar el UID del usuario que realizó la compra
-        userEmail: window.currentUserEmail // Guardar el email del usuario (o 'Anónimo')
+        userEmail: window.currentUserEmail // Guardar el email del usuario (o 'Anónimo' si es anónimo)
     };
 
     try {
@@ -1001,7 +998,7 @@ async function handleLogin(event) {
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
         let errorMessage = "Error al iniciar sesión. Por favor, verifica tus credenciales.";
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
             errorMessage = "Correo electrónico o contraseña incorrectos.";
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "El formato del correo electrónico es inválido.";
@@ -1050,7 +1047,8 @@ async function handleLogout() {
         try {
             await signOut(auth);
             showMessage('Sesión Cerrada', 'Has cerrado sesión correctamente.');
-            // onAuthStateChanged se encargará de actualizar la UI
+            // onAuthStateChanged se encargará de actualizar la UI y, al no haber usuario,
+            // el listener de Firestore se desuscribirá y se mostrará el modal de auth.
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
             showMessage('Error al Cerrar Sesión', `Hubo un problema al cerrar sesión: ${error.message}.`);
@@ -1152,6 +1150,9 @@ registerForm.addEventListener('submit', handleRegister);
 
 
 // --- Initial Setup ---
+// Variable para almacenar la función de desuscripción de onSnapshot
+let unsubscribeFromSales = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeData();
     renderMenu();
@@ -1161,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('firebaseAuthReady', () => {
         // Actualizar las variables locales con los valores globales una vez que estén disponibles
         currentUserId = window.currentUserId;
-        currentUserEmail = window.currentUserEmail; // Actualizar el email
+        currentUserEmail = window.currentUserEmail;
         isAuthReady = window.isAuthReady;
 
         // Actualizar el estado del usuario en la UI
@@ -1173,14 +1174,23 @@ document.addEventListener('DOMContentLoaded', () => {
             authButton.textContent = 'Iniciar Sesión / Registrarse';
         }
         
+        // Lógica para el listener de Firestore:
+        // Si hay un usuario autenticado y Firebase está listo, configurar el listener.
         if (isAuthReady && window.db && currentUserId && appId) {
             console.log("POS Script: Firebase Auth está listo. Configurando listener de Firestore.");
             console.log("POS Script: ID de Usuario Actual:", currentUserId);
             
+            // Si ya hay un listener activo, desuscribirse primero para evitar duplicados
+            if (unsubscribeFromSales) {
+                unsubscribeFromSales();
+                console.log("Firestore: Listener anterior desuscrito.");
+            }
+
             const salesCollectionRef = collection(window.db, `artifacts/${appId}/users/${currentUserId}/dailySales`);
             const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
 
-            onSnapshot(q, (snapshot) => {
+            // Suscribirse al listener y guardar la función de desuscripción
+            unsubscribeFromSales = onSnapshot(q, (snapshot) => {
                 dailySales = [];
                 snapshot.forEach((doc) => {
                     dailySales.push({ id: doc.id, ...doc.data() });
@@ -1196,15 +1206,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Firestore: Error al obtener ventas diarias:", error);
                 if (error.code === 'permission-denied') {
                     showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, verifica las reglas de seguridad de Firestore y tu estado de autenticación.');
+                    dailySales = []; // Limpiar ventas si hay error de permisos
+                    renderDailySales(); // Renderizar lista vacía
                 } else {
                     showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
                 }
             });
         } else {
-            console.warn("POS Script: Firebase o ID de usuario no listos, no se puede configurar el listener de Firestore. Mostrando solo datos locales.");
-            renderDailySales();
-            if (!isAuthReady) {
-                showMessage('Problema de Autenticación', 'No se pudo establecer la conexión con la base de datos. Las ventas no se guardarán. Por favor, recarga la página o verifica la configuración de autenticación en Firebase.');
+            // Si no hay usuario autenticado o Firebase no está listo, desuscribir el listener si existe
+            if (unsubscribeFromSales) {
+                unsubscribeFromSales();
+                unsubscribeFromSales = null; // Resetear la variable
+                console.log("Firestore: Listener desuscrito porque no hay usuario autenticado.");
+            }
+            dailySales = []; // Limpiar las ventas en memoria
+            renderDailySales(); // Renderizar la lista vacía
+
+            // Mostrar el modal de autenticación si no hay usuario autenticado al inicio
+            if (isAuthReady && !currentUserId) { // isAuthReady es true si la verificación inicial terminó
+                openAuthModal();
+                showMessage('¡Bienvenido!', 'Por favor, inicia sesión o regístrate para empezar a usar el punto de venta y guardar tus ventas.');
+            } else if (!isAuthReady) {
+                 // Esto cubre el caso de que firebaseConfig sea inválido o haya un problema mayor
+                showMessage('Problema de Inicialización', 'No se pudo inicializar Firebase. Las ventas no se guardarán. Por favor, recarga la página.');
             }
         }
     });
