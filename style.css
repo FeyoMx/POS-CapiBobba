@@ -1054,3 +1054,145 @@ input:checked + .slider:before {
         width: 100%;
     }
 }
+/* --- Estilos para el Modal de Autenticación (NUEVO) --- */
+.auth-modal-content {
+    max-width: 450px;
+    padding: 25px;
+}
+
+.auth-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-light-gray);
+}
+
+.auth-tab-button {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--text-gray);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.auth-tab-button.active {
+    color: var(--capibobba-purple);
+    border-bottom-color: var(--capibobba-purple);
+}
+
+.auth-tab-button:hover {
+    color: var(--capibobba-pink);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.auth-form input[type="email"],
+.auth-form input[type="password"] {
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-small);
+    font-family: var(--primary-font);
+    font-size: 1em;
+    width: 100%;
+    box-sizing: border-box; /* Incluye padding y border en el ancho */
+}
+
+.auth-form input[type="email"]:focus,
+.auth-form input[type="password"]:focus {
+    outline: 2px solid var(--capibobba-purple);
+    outline-offset: 2px;
+    border-color: transparent;
+}
+
+.auth-form .action-button {
+    width: auto; /* Permite que el botón se ajuste al contenido */
+    align-self: center; /* Centra el botón en el formulario */
+    padding: 10px 30px;
+    margin-top: 10px;
+}
+
+.auth-modal-content .modal-close-button {
+    background-color: var(--secondary-gray);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-top: 20px;
+    transition: background-color 0.2s ease;
+}
+
+.auth-modal-content .modal-close-button:hover {
+    background-color: var(--secondary-dark-gray);
+}
+
+/* Estilos para la barra de encabezado (NUEVO) */
+.app-header {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--background-white);
+    padding: 15px 25px;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow-medium);
+    margin-bottom: 20px;
+    box-sizing: border-box;
+}
+
+.user-status {
+    font-weight: 700;
+    color: var(--capibobba-purple);
+    font-size: 1.1em;
+}
+
+.auth-button {
+    background-color: var(--capibobba-pink);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-small);
+    padding: 8px 15px;
+    font-size: 0.9em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.auth-button:hover {
+    background-color: #FF1493; /* Un rosa más oscuro */
+}
+
+.auth-button:focus {
+    outline: 2px solid var(--capibobba-purple);
+    outline-offset: 2px;
+}
+
+/* Responsive adjustments for header */
+@media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px;
+    }
+    .user-status {
+        text-align: center;
+        width: 100%;
+    }
+    .auth-button {
+        width: 100%;
+        max-width: 250px; /* Limita el ancho en móviles también */
+    }
+}
+
+
