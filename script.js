@@ -307,6 +307,7 @@ function initializeData() {
         { id: 'water-maracuya', name: 'Frappé Maracuyá (Agua)', price: 75, type: 'drink' },
         { id: 'water-guanabana', name: 'Frappé Guanábana (Agua)', price: 75, type: 'drink' },
         { id: 'water-sandia', name: 'Frappé Sandía (Agua)', price: 75, type: 'drink' },
+        { id: 'water-tamarindo', name: 'Frappé Tamarindo (Agua)', price: 75, type: 'drink' }, // Nuevo
         // Frappés base leche
         { id: 'milk-choco-mexicano', name: 'Frappé Chocolate Mexicano (Leche)', price: 75, type: 'drink' },
         { id: 'milk-taro', name: 'Frappé Taro (Leche)', price: 75, type: 'drink' },
@@ -327,6 +328,7 @@ function initializeData() {
         { id: 'hot-matcha', name: 'Matcha Caliente', price: 60, type: 'drink' },
         // Promociones (tratadas como bebidas por ahora)
         { id: 'promo-fresas-crema', name: 'Frappé Fresas con Crema (Temporada)', price: 75, type: 'drink' },
+        { id: 'promo-chamoyada', name: 'Chamoyada (Temporada)', price: 75, type: 'drink' }, // Nuevo
     ];
 
     // Define available toppings separately
