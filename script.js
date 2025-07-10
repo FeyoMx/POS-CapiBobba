@@ -1,16 +1,11 @@
 // Importa solo los módulos de Firestore que necesita este script
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // Importa los módulos de autenticación de Firebase
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, signInAnonymously, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-
-// Accede a las instancias globales de Firebase que se inicializaron en index.html
-const db = window.db;
-const auth = window.auth; // Acceder a la instancia de auth
-let currentUserId = window.currentUserId;
-let currentUserEmail = window.currentUserEmail; // Nuevo: para almacenar el email
-let isAuthReady = window.isAuthReady;
-const appId = window.appId;
+// Importa las instancias inicializadas de Firebase desde el módulo de inicialización.
+// Esto elimina la dependencia de variables globales en `window`.
+import { db, auth, appId } from './firebase-init.js';
 
 // --- IMPORTANTE: CONFIGURACIÓN DE SEGURIDAD EN FIRESTORE ---
 // Recuerda que tu API Key está expuesta en el cliente.
@@ -308,6 +303,7 @@ function initializeData() {
         { id: 'water-guanabana', name: 'Frappé Guanábana (Agua)', price: 75, type: 'drink' },
         { id: 'water-sandia', name: 'Frappé Sandía (Agua)', price: 75, type: 'drink' },
         { id: 'water-tamarindo', name: 'Frappé Tamarindo (Agua)', price: 75, type: 'drink' }, // Nuevo
+        { id: 'milk-pay-de-limon', name: 'Frappé Pay de Limon (Leche)', price: 75, type: 'drink' }, // ¡Nuevo sabor!
         // Frappés base leche
         { id: 'milk-choco-mexicano', name: 'Frappé Chocolate Mexicano (Leche)', price: 75, type: 'drink' },
         { id: 'milk-taro', name: 'Frappé Taro (Leche)', price: 75, type: 'drink' },
@@ -670,33 +666,29 @@ async function completeSale() {
         return;
     }
 
-    // Asegurarse de que Firebase esté listo y haya un User ID VÁLIDO
-    if (!window.isAuthReady || !window.db || !window.currentUserId) {
-        console.error("Firebase: DB o User ID no están listos o la autenticación falló.", { isAuthReady: window.isAuthReady, db: window.db, currentUserId: window.currentUserId });
-        
-        let errorMessage = 'No hay una sesión de usuario activa. Por favor, inicia sesión o regístrate para guardar ventas.';
-        if (!window.isAuthReady) {
-            errorMessage = 'La inicialización de Firebase no ha finalizado. Por favor, espera un momento o recarga la página.';
-        }
-        showMessage('Error de Autenticación', errorMessage);
+    // Obtener el usuario actual directamente desde el servicio de autenticación.
+    const user = auth.currentUser;
+    if (!user) {
+        console.error("Firebase: No hay usuario autenticado para guardar la venta.");
+        showMessage('Error de Autenticación', 'No hay una sesión de usuario activa. Por favor, inicia sesión o regístrate para guardar ventas.');
         return;
     }
 
-    console.log("Attempting to save sale. Current User ID:", window.currentUserId, "Email:", window.currentUserEmail);
+    console.log("Attempting to save sale. Current User ID:", user.uid, "Email:", user.email);
 
+    // Preparar los datos de la venta
     const total = parseFloat(transactionTotalElement.textContent.replace('Total: $', ''));
 
     const saleData = {
         timestamp: new Date().toISOString(),
         items: JSON.parse(JSON.stringify(currentTransaction)),
         total: total,
-        userId: window.currentUserId, // Guardar el UID del usuario que realizó la compra
-        userEmail: window.currentUserEmail // Guardar el email del usuario (o 'Anónimo' si es anónimo)
+        userId: user.uid, // Guardar el UID del usuario que realizó la compra
+        userEmail: user.email || 'Anónimo' // Guardar el email del usuario
     };
 
     try {
-        // CAMBIO CLAVE: Apuntar a la colección pública con la ruta corregida
-        const salesCollectionRef = collection(window.db, `artifacts/${window.appId}/public/data/dailySales`);
+        const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
 
         if (editingSaleDocId) {
             const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
@@ -746,14 +738,17 @@ function clearTransaction() {
  * @param {string} saleId The ID of the sale document to delete.
  */
 async function deleteSale(saleId) {
-    if (!window.isAuthReady || !window.db || !window.currentUserId) {
-        showMessage('Error de Autenticación', 'Firebase no está listo o el ID de usuario no está disponible.');
+    // Verificar que haya un usuario autenticado antes de permitir la eliminación.
+    const user = auth.currentUser;
+    if (!user) {
+        showMessage('Error de Autenticación', 'Debes iniciar sesión para eliminar ventas.');
         return;
     }
 
     try {
-        // CAMBIO CLAVE: Apuntar a la colección pública con la ruta corregida para eliminar
-        const saleDocRef = doc(window.db, `artifacts/${window.appId}/public/data/dailySales`, saleId);
+        // Apuntar a la colección pública con la ruta corregida para eliminar
+        // Las reglas de seguridad de Firestore deben verificar si el usuario tiene permiso.
+        const saleDocRef = doc(db, `artifacts/${appId}/public/data/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);
         showMessage('Venta Eliminada', 'La venta ha sido eliminada del historial.');
@@ -1228,21 +1223,77 @@ backToLoginFromResetButton.addEventListener('click', showLoginTab); // Nuevo: li
 let unsubscribeFromSales = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Inicializa los datos estáticos y la UI básica al cargar el DOM.
     initializeData();
     renderMenu();
     updateTransactionDisplay();
-    
-    // Escuchar el evento personalizado que indica que Firebase Auth está listo
-    document.addEventListener('firebaseAuthReady', () => {
-        // Actualizar las variables locales con los valores globales una vez que estén disponibles
-        currentUserId = window.currentUserId;
-        currentUserEmail = window.currentUserEmail;
-        isAuthReady = window.isAuthReady;
+});
 
-        // Actualizar el estado del usuario en la UI
-        if (currentUserEmail) {
-            userStatusElement.textContent = `Sesión iniciada como: ${currentUserEmail}`;
-            authButton.textContent = 'Cerrar Sesión';
+// El listener onAuthStateChanged es el punto de entrada principal para la lógica
+// que depende de la autenticación. Se dispara al cargar la página y cada vez
+// que el estado de autenticación del usuario cambia (inicio/cierre de sesión).
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // --- Usuario está autenticado ---
+        console.log("Auth state changed: User is logged in.", user.uid);
+        userStatusElement.textContent = `Sesión iniciada como: ${user.email}`;
+        authButton.textContent = 'Cerrar Sesión';
+
+        // Si ya hay un listener activo, desuscribirse primero para evitar duplicados.
+        if (unsubscribeFromSales) {
+            unsubscribeFromSales();
+            console.log("Firestore: Listener anterior desuscrito.");
+        }
+
+        // Configurar el listener de Firestore para obtener las ventas en tiempo real.
+        const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
+        const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
+
+        unsubscribeFromSales = onSnapshot(q, (snapshot) => {
+            dailySales = [];
+            snapshot.forEach((doc) => {
+                dailySales.push({ id: doc.id, ...doc.data() });
+            });
+            console.log("Firestore: Ventas diarias actualizadas.", dailySales);
+            
+            // Re-renderizar la lista de ventas, aplicando el filtro si está activo.
+            if (isFilterEnabled) {
+                applySalesFilter();
+            } else {
+                renderDailySales();
+            }
+        }, (error) => {
+            console.error("Firestore: Error al obtener ventas diarias:", error);
+            if (error.code === 'permission-denied') {
+                showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, inicia sesión con una cuenta válida.');
+                dailySales = []; // Limpiar ventas si hay error de permisos
+                renderDailySales(); // Renderizar lista vacía
+            } else {
+                showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
+            }
+        });
+    } else {
+        // --- No hay usuario autenticado ---
+        console.log("Auth state changed: User is logged out.");
+        userStatusElement.textContent = 'No hay sesión iniciada';
+        authButton.textContent = 'Iniciar Sesión / Registrarse';
+
+        // Desuscribir el listener de Firestore ya que no hay usuario.
+        if (unsubscribeFromSales) {
+            unsubscribeFromSales();
+            unsubscribeFromSales = null;
+            console.log("Firestore: Listener desuscrito porque no hay usuario autenticado.");
+        }
+        // Limpiar los datos en memoria y en la UI.
+        dailySales = [];
+        renderDailySales();
+
+        // Opcional: Mostrar un mensaje o el modal de login al cargar si no hay sesión.
+        // Esto se puede activar si se desea forzar el login al inicio.
+        // showMessage('¡Bienvenido!', 'Por favor, inicia sesión o regístrate para empezar.');
+        // openAuthModal();
+    }
+});
         } else {
             userStatusElement.textContent = 'No hay sesión iniciada';
             authButton.textContent = 'Iniciar Sesión / Registrarse';
