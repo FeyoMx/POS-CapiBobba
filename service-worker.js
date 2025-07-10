@@ -1,6 +1,6 @@
 // Define el nombre de la caché para esta versión de la aplicación.
 // Cambia este nombre cada vez que realices cambios significativos en los archivos para asegurar que los usuarios obtengan la nueva versión.
-const CACHE_NAME = 'capibobba-pos-v1.0.1';
+const CACHE_NAME = 'capibobba-pos-v1.1.0'; // Versión incrementada para la nueva estrategia
 
 // Lista de archivos para pre-cachear durante la instalación del Service Worker.
 // Incluye todos los recursos estáticos esenciales para que la aplicación funcione offline.
@@ -9,9 +9,9 @@ const urlsToCache = [
   './index.html',
   './style.css',
   './script.js',
+  './firebase-init.js', // IMPORTANTE: Añadir para que la app funcione offline
   './manifest.json',
-  // Asegúrate de que esta ruta sea correcta y que la imagen exista en tu servidor.
-  '/images/capibobba-icon-192x192.png' 
+  './images/capibobba-icon-192x192.png' // Usar ruta relativa para mayor compatibilidad
 ];
 
 /*
@@ -34,51 +34,57 @@ self.addEventListener('install', (event) => {
 
 /*
   Evento 'fetch': Se dispara cada vez que el navegador intenta cargar un recurso.
-  Aquí interceptamos las solicitudes y servimos recursos desde la caché si están disponibles,
-  o los obtenemos de la red y los cacheamos para uso futuro.
+  Implementamos una estrategia de caché híbrida para optimizar la velocidad y la actualización.
 */
 self.addEventListener('fetch', (event) => {
-  // Ignora las solicitudes que no sean HTTP/HTTPS (ej. chrome-extension://)
-  if (!event.request.url.startsWith('http')) {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Ignora las peticiones que no son GET y las llamadas a la API de Firebase.
+  // Dejamos que el SDK de Firebase maneje su propia lógica de red y offline.
+  if (request.method !== 'GET' || url.hostname.includes('firestore.googleapis.com') || url.hostname.includes('firebase.googleapis.com')) {
     return;
   }
 
-  // Estrategia Cache-First, Network-Fallback:
-  // 1. Intenta responder desde la caché.
-  // 2. Si no está en caché, ve a la red.
-  // 3. Una vez en la red, cachea la respuesta para futuras solicitudes.
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Si el recurso está en caché, lo devolvemos.
-        if (response) {
-          console.log(`[Service Worker] Sirviendo desde caché: ${event.request.url}`);
-          return response;
-        }
-        
-        // Si no está en caché, hacemos la solicitud a la red.
-        console.log(`[Service Worker] Obteniendo de la red y cacheando: ${event.request.url}`);
-        return fetch(event.request)
-          .then((networkResponse) => {
-            // Verifica si la respuesta de la red es válida (no es un error, no es opaca)
-            if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-              return networkResponse;
+  // Estrategia 1: Stale-While-Revalidate para el App Shell (HTML, CSS, JS).
+  // Sirve desde la caché para velocidad, pero actualiza en segundo plano.
+  if (request.destination === 'document' || request.destination === 'style' || request.destination === 'script') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(cache => {
+        return cache.match(request).then(cachedResponse => {
+          const fetchPromise = fetch(request).then(networkResponse => {
+            // Si la petición a la red es exitosa, actualizamos la caché.
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
             }
-
-            // Clona la respuesta porque la respuesta original es un stream y solo se puede consumir una vez.
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache); // Guarda la respuesta en caché
-              });
-            return networkResponse; // Devuelve la respuesta de la red
-          })
-          .catch((error) => {
-            console.error(`[Service Worker] Error al obtener de la red: ${event.request.url}`, error);
-            // Puedes devolver una página offline personalizada aquí si lo deseas.
-            // Por ejemplo: return caches.match('/offline.html');
+            return networkResponse;
           });
+          // Devolvemos la respuesta de la caché inmediatamente si existe,
+          // si no, esperamos a que la red responda.
+          return cachedResponse || fetchPromise;
+        });
       })
+    );
+    return;
+  }
+
+  // Estrategia 2: Cache First para todos los demás recursos (imágenes, fuentes, etc.).
+  // Si está en caché, se sirve desde ahí. Si no, se busca en la red y se cachea.
+  event.respondWith(
+    caches.match(request).then(cachedResponse => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(request).then(networkResponse => {
+        return caches.open(CACHE_NAME).then(cache => {
+          if (networkResponse && networkResponse.status === 200) {
+            cache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        }
+        );
+      });
+    })
   );
 });
 
