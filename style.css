@@ -335,6 +335,13 @@ h2 {
     margin-top: 5px;
 }
 
+.sale-address {
+  font-size: 0.9em;
+  color: var(--text-gray);
+  margin: 8px 0 4px 0;
+  padding-left: 15px; /* Para alinear con la lista de productos */
+}
+
 .sale-total {
     font-weight: 800;
     text-align: right;
@@ -1189,4 +1196,3 @@ input:checked + .slider:before {
         font-size: 1em; /* Adjusted font size */
     }
 }
-

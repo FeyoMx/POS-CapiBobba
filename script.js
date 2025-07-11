@@ -457,6 +457,9 @@ function renderDailySales(salesToRender = dailySales) {
         // Display who made the sale if available
         const recordedBy = sale.userEmail ? `Registrado por: ${sale.userEmail}` : '';
 
+        // NUEVO: Mostrar la dirección si está disponible en los datos de la venta.
+        const addressDisplay = sale.direccion ? `<p class="sale-address"><strong>Dirección:</strong> ${sale.direccion}</p>` : '';
+
         saleItemDiv.innerHTML = `
             <div class="sale-header">
                 <span>Venta #${sortedSales.length - index}</span>
@@ -464,6 +467,7 @@ function renderDailySales(salesToRender = dailySales) {
             </div>
             <div class="sale-details">
                 ${saleDetailsHtml}
+                ${addressDisplay}
                 ${recordedBy ? `<p class="sale-recorded-by">${recordedBy}</p>` : ''}
             </div>
             <div class="sale-total">Total Venta: $${sale.total.toFixed(2)}</div>
@@ -668,6 +672,18 @@ async function completeSale() {
         return;
     }
 
+    // NUEVO: Solicitar la dirección de entrega.
+    // Si estamos editando, precargamos la dirección existente.
+    const saleBeingEdited = editingSaleDocId ? dailySales.find(s => s.id === editingSaleDocId) : null;
+    const existingAddress = saleBeingEdited ? saleBeingEdited.direccion : '';
+    const address = prompt("Por favor, introduce la dirección de entrega (deja en blanco si no aplica):", existingAddress || '');
+
+    // Si el usuario presiona "Cancelar" en el prompt, la venta no se completa.
+    if (address === null) {
+        showMessage('Operación Cancelada', 'La venta no fue completada ni actualizada.');
+        return;
+    }
+
     // Obtener el usuario actual directamente desde el servicio de autenticación.
     const user = auth.currentUser;
     if (!user) {
@@ -686,7 +702,8 @@ async function completeSale() {
         items: JSON.parse(JSON.stringify(currentTransaction)),
         total: total,
         userId: user.uid, // Guardar el UID del usuario que realizó la compra
-        userEmail: user.email || 'Anónimo' // Guardar el email del usuario
+        userEmail: user.email || 'Anónimo', // Guardar el email del usuario
+        direccion: address // NUEVO: Guardar la dirección en los datos de la venta.
     };
 
     try {
