@@ -333,6 +333,8 @@ function initializeData() {
         { id: 'topping-manzana-verde', name: 'Perlas explosivas de manzana verde', price: 10 },
         { id: 'topping-litchi', name: 'Perlas explosivas de litchi', price: 10 },
         { id: 'topping-arcoiris', name: 'Jelly arcoiris', price: 10 },
+        { id: 'topping-cristal', name: 'Perlas Cristal', price: 10 },
+        { id: 'topping-tapioca-extra', name: 'Extra Tapioca', price: 10 },
     ];
 }
 
