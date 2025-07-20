@@ -53,10 +53,16 @@
                 <!-- Los ítems de la transacción se cargarán aquí dinámicamente -->
                 <li role="listitem" style="text-align: center; color: var(--text-gray);">¡Añade productos para empezar!</li>
             </ul>
-            <div class="transaction-total" id="transactionTotal" aria-live="polite">Total: $0.00</div>
+            <!-- Contenedor para el resumen de la transacción -->
+            <div class="transaction-summary">
+                <div id="subtotalDisplay" aria-live="polite">Subtotal: $0.00</div>
+                <div id="discountDisplay" class="hidden" aria-live="polite">Descuento: -$0.00</div>
+                <div class="transaction-total" id="transactionTotal" aria-live="polite">Total: $0.00</div>
+            </div>
             <div class="transaction-actions" role="group" aria-label="Acciones de Transacción">
                 <!-- Etiquetas aria-label para accesibilidad en botones con iconos/emojis -->
                 <button class="action-button whatsapp" id="whatsappConfirmationButton" aria-label="Enviar confirmación de pedido por WhatsApp">Confirmación de pedido 📱</button>
+                <button class="action-button discount" id="applyDiscountButton" aria-label="Aplicar descuento al pedido">Aplicar Descuento 💸</button>
                 <button class="action-button" id="completeSaleButton" aria-label="Completar y pagar venta">Pagar ✅</button>
                 <button class="action-button clear" id="clearTransactionButton" aria-label="Vaciar transacción actual">Vaciar Transacción 🗑️</button>
             </div>
@@ -153,6 +159,21 @@
                 <button id="noToppingsButton">Sin Toppings 🚫</button>
                 <button id="cancelToppingsButton">Cancelar ❌</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Discount Modal (con roles ARIA para accesibilidad) -->
+    <div id="discountModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="discountModalTitle">
+        <div class="modal-content">
+            <h3 id="discountModalTitle">Aplicar Descuento</h3>
+            <p>Ingresa el monto fijo de descuento a aplicar.</p>
+            <div class="discount-input-container">
+                <span>$</span>
+                <input type="number" id="discountInput" min="0" step="0.01" placeholder="Ej: 10.00" aria-label="Monto del descuento">
+            </div>
+            <button id="confirmDiscountButton">Aplicar</button>
+            <button id="removeDiscountButton" class="clear">Quitar Descuento</button>
+            <button id="cancelDiscountButton">Cancelar</button>
         </div>
     </div>
 

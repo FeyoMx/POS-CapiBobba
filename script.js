@@ -39,6 +39,7 @@ let availableToppings = [];
 let currentTransaction = [];
 let dailySales = [];
 let editingSaleDocId = null;
+let currentDiscountAmount = 0; // NUEVO: Para manejar el descuento por monto fijo
 
 let currentDrinkBeingCustomized = null;
 
@@ -46,6 +47,8 @@ let currentDrinkBeingCustomized = null;
 const menuGrid = document.getElementById('menuGrid');
 const transactionList = document.getElementById('transactionList');
 const transactionTotalElement = document.getElementById('transactionTotal');
+const subtotalDisplay = document.getElementById('subtotalDisplay'); // NUEVO
+const discountDisplay = document.getElementById('discountDisplay'); // NUEVO
 const completeSaleButton = document.getElementById('completeSaleButton');
 const clearTransactionButton = document.getElementById('clearTransactionButton');
 const whatsappConfirmationButton = document.getElementById('whatsappConfirmationButton');
@@ -109,6 +112,14 @@ const showLoginTabButton = document.getElementById('showLoginTab');
 const showRegisterTabButton = document.getElementById('showRegisterTab');
 const showPasswordResetTabButton = document.getElementById('showPasswordResetTab'); // Nuevo: botón de tab para recuperación
 const closeAuthModalButton = document.getElementById('closeAuthModal');
+
+// --- NUEVOS ELEMENTOS DOM para Descuentos ---
+const applyDiscountButton = document.getElementById('applyDiscountButton');
+const discountModalOverlay = document.getElementById('discountModalOverlay');
+const discountInput = document.getElementById('discountInput');
+const confirmDiscountButton = document.getElementById('confirmDiscountButton');
+const removeDiscountButton = document.getElementById('removeDiscountButton');
+const cancelDiscountButton = document.getElementById('cancelDiscountButton');
 
 
 // --- Funciones de Utilidad para Accesibilidad ---
@@ -286,6 +297,28 @@ function showPasswordResetTab() {
     resetEmailInput.focus(); // Set focus to email input
 }
 
+/**
+ * Opens the discount modal.
+ */
+function openDiscountModal() {
+    lastFocusedElement = document.activeElement;
+    discountInput.value = currentDiscountAmount > 0 ? currentDiscountAmount.toFixed(2) : '';
+    discountModalOverlay.classList.add('show');
+    trapFocus(discountModalOverlay.querySelector('.modal-content'));
+}
+
+/**
+ * Closes the discount modal.
+ */
+function closeDiscountModal() {
+    discountModalOverlay.classList.remove('show');
+    if (lastFocusedElement) {
+        lastFocusedElement.focus();
+        lastFocusedElement = null;
+    }
+}
+
+
 
 // --- Data Initialization ---
 /**
@@ -373,7 +406,7 @@ function renderMenu() {
  */
 function updateTransactionDisplay() {
     transactionList.innerHTML = '';
-    let total = 0;
+    let subtotal = 0;
 
     if (currentTransaction.length === 0) {
         transactionList.innerHTML = '<li role="listitem" style="text-align: center; color: var(--text-gray);">¡Añade productos para empezar!</li>';
@@ -391,7 +424,7 @@ function updateTransactionDisplay() {
             }
 
             const itemSubtotal = (item.price + toppingsPrice) * item.quantity;
-            total += itemSubtotal;
+            subtotal += itemSubtotal;
 
             li.innerHTML = `
                 <div class="item-info">
@@ -403,6 +436,21 @@ function updateTransactionDisplay() {
             `;
             transactionList.appendChild(li);
         });
+    }
+
+    // Lógica de cálculo de descuento
+    // Validar que el descuento no sea mayor que el subtotal
+    const finalDiscountAmount = Math.min(subtotal, currentDiscountAmount);
+    const total = subtotal - finalDiscountAmount;
+
+    // Actualizar la UI del resumen de la transacción
+    subtotalDisplay.textContent = `Subtotal: $${subtotal.toFixed(2)}`;
+
+    if (finalDiscountAmount > 0) {
+        discountDisplay.textContent = `Descuento: -$${finalDiscountAmount.toFixed(2)}`;
+        discountDisplay.classList.remove('hidden');
+    } else {
+        discountDisplay.classList.add('hidden');
     }
 
     transactionTotalElement.textContent = `Total: $${total.toFixed(2)}`;
@@ -442,6 +490,7 @@ function renderDailySales(salesToRender = dailySales) {
         saleItemDiv.setAttribute('role', 'listitem');
 
         const saleDate = new Date(sale.timestamp).toLocaleString();
+        // Construir detalles de los ítems
         let saleDetailsHtml = '<ul role="list">';
         sale.items.forEach(item => {
             let toppingsDetail = '';
@@ -454,11 +503,22 @@ function renderDailySales(salesToRender = dailySales) {
         });
         saleDetailsHtml += '</ul>';
 
-        // Display who made the sale if available
-        const recordedBy = sale.userEmail ? `Registrado por: ${sale.userEmail}` : '';
+        // Construir resumen del total (con desglose de descuento si existe)
+        let totalSummaryHtml = '';
+        if (sale.discountAmount && sale.discountAmount > 0) {
+            totalSummaryHtml = `
+                <p class="sale-subtotal">Subtotal: $${sale.subtotal.toFixed(2)}</p>
+                <p class="sale-discount">Descuento: -$${sale.discountAmount.toFixed(2)}</p>
+                <div class="sale-total">Total Venta: $${sale.total.toFixed(2)}</div>
+            `;
+        } else {
+            totalSummaryHtml = `<div class="sale-total">Total Venta: $${sale.total.toFixed(2)}</div>`;
+        }
 
-        // NUEVO: Mostrar la dirección si está disponible en los datos de la venta.
+        // Mostrar quién registró la venta y la dirección
+        const recordedBy = sale.userEmail ? `Registrado por: ${sale.userEmail}` : '';
         const addressDisplay = sale.direccion ? `<p class="sale-address"><strong>Dirección:</strong> ${sale.direccion}</p>` : '';
+
 
         saleItemDiv.innerHTML = `
             <div class="sale-header">
@@ -470,7 +530,7 @@ function renderDailySales(salesToRender = dailySales) {
                 ${addressDisplay}
                 ${recordedBy ? `<p class="sale-recorded-by">${recordedBy}</p>` : ''}
             </div>
-            <div class="sale-total">Total Venta: $${sale.total.toFixed(2)}</div>
+            ${totalSummaryHtml}
             <div class="sale-actions" role="group" aria-label="Acciones para la venta">
                 <button class="sale-action-btn edit" data-sale-id="${sale.id}" aria-label="Editar venta #${sortedSales.length - index}">✏️</button>
                 <button class="sale-action-btn delete" data-sale-id="${sale.id}" aria-label="Eliminar venta #${sortedSales.length - index}">🗑️</button>
@@ -661,6 +721,46 @@ function decrementItemQuantity(transactionLineId) {
     }
 }
 
+/**
+ * Applies a fixed amount discount to the current transaction.
+ */
+function applyDiscount() {
+    const amount = parseFloat(discountInput.value);
+
+    if (isNaN(amount) || amount < 0) {
+        showMessage('Valor Inválido', 'Por favor, ingresa un monto de descuento válido y positivo.');
+        return;
+    }
+
+    // Calcular subtotal actual para validar que el descuento no sea mayor
+    const subtotal = currentTransaction.reduce((sum, item) => {
+        const toppingsPrice = item.toppings ? item.toppings.reduce((tsum, t) => tsum + t.price, 0) : 0;
+        return sum + (item.price + toppingsPrice) * item.quantity;
+    }, 0);
+
+    if (amount > subtotal) {
+        showMessage('Descuento Excesivo', `El descuento ($${amount.toFixed(2)}) no puede ser mayor que el subtotal ($${subtotal.toFixed(2)}).`);
+        return;
+    }
+
+    currentDiscountAmount = amount;
+    updateTransactionDisplay();
+    closeDiscountModal();
+    showMessage('Descuento Aplicado', `Se ha aplicado un descuento de $${amount.toFixed(2)}.`);
+}
+
+/**
+ * Removes any applied discount from the current transaction.
+ */
+function removeDiscount() {
+    if (currentDiscountAmount > 0) {
+        currentDiscountAmount = 0;
+        updateTransactionDisplay();
+        showMessage('Descuento Eliminado', 'Se ha quitado el descuento de la transacción.');
+    }
+    closeDiscountModal();
+}
+
 
 /**
  * Completes the current sale and adds it to daily sales (Firestore)
@@ -695,11 +795,17 @@ async function completeSale() {
     console.log("Attempting to save sale. Current User ID:", user.uid, "Email:", user.email);
 
     // Preparar los datos de la venta
-    const total = parseFloat(transactionTotalElement.textContent.replace('Total: $', ''));
+    const subtotal = currentTransaction.reduce((sum, item) => {
+        const toppingsPrice = item.toppings ? item.toppings.reduce((tsum, t) => tsum + t.price, 0) : 0;
+        return sum + (item.price + toppingsPrice) * item.quantity;
+    }, 0);
+    const total = subtotal - currentDiscountAmount;
 
     const saleData = {
         timestamp: new Date().toISOString(),
         items: JSON.parse(JSON.stringify(currentTransaction)),
+        subtotal: subtotal,
+        discountAmount: currentDiscountAmount,
         total: total,
         userId: user.uid, // Guardar el UID del usuario que realizó la compra
         userEmail: user.email || 'Anónimo', // Guardar el email del usuario
@@ -722,6 +828,7 @@ async function completeSale() {
         }
         
         currentTransaction = [];
+        currentDiscountAmount = 0; // Resetear descuento después de la venta
         updateTransactionDisplay();
     } catch (error) {
         console.error("Error saving document to Firestore: ", error);
@@ -744,6 +851,7 @@ function clearTransaction() {
 
     showConfirm('Confirmar Vaciado', '¿Estás seguro de que quieres vaciar la transacción actual?', () => {
         currentTransaction = [];
+        currentDiscountAmount = 0; // Resetear descuento
         editingSaleDocId = null;
         updateTransactionDisplay();
         showMessage('Transacción Vaciada', 'Todos los productos han sido eliminados de la transacción.');
@@ -789,6 +897,7 @@ function editSale(saleId) {
     const saleToEdit = dailySales.find(sale => sale.id === saleId);
     if (saleToEdit) {
         currentTransaction = JSON.parse(JSON.stringify(saleToEdit.items));
+        currentDiscountAmount = saleToEdit.discountAmount || 0; // Cargar descuento existente
         editingSaleDocId = saleId;
         updateTransactionDisplay();
         showMessage('Modo Edición', `Editando venta #${dailySales.findIndex(s => s.id === saleId) + 1}. Realiza cambios y haz clic en "Actualizar Venta".`);
@@ -859,7 +968,13 @@ function sendWhatsAppConfirmation() {
         return;
     }
 
-    const total = parseFloat(transactionTotalElement.textContent.replace('Total: $', ''));
+    // Calcular totales para el mensaje, incluyendo el descuento
+    const subtotal = currentTransaction.reduce((sum, item) => {
+        const toppingsPrice = item.toppings ? item.toppings.reduce((tsum, t) => tsum + t.price, 0) : 0;
+        return sum + (item.price + toppingsPrice) * item.quantity;
+    }, 0);
+    const total = subtotal - currentDiscountAmount;
+
     let message = "¡Hola! Tu pedido de Capibobba ha sido confirmado:\n\n";
     let itemNumber = 1;
 
@@ -874,6 +989,10 @@ function sendWhatsAppConfirmation() {
         itemNumber++;
     });
 
+    message += `\nSubtotal: $${subtotal.toFixed(2)}`;
+    if (currentDiscountAmount > 0) {
+        message += `\nDescuento: -$${currentDiscountAmount.toFixed(2)}`;
+    }
     message += `\nTotal de tu pedido: $${total.toFixed(2)}`;
     message += `\n\nTu pago será en efectivo? Te llevo cambio? O si prefieres por transferencia a la siguiente CLABE 722968010305501833`;
     message += `\n\n¡Gracias por tu compra! 💖`;
@@ -1154,6 +1273,12 @@ confirmYesButton.addEventListener('click', () => {
     hideConfirm();
 });
 confirmNoButton.addEventListener('click', hideConfirm);
+
+// Discount Modal Buttons
+applyDiscountButton.addEventListener('click', openDiscountModal);
+cancelDiscountButton.addEventListener('click', closeDiscountModal);
+confirmDiscountButton.addEventListener('click', applyDiscount);
+removeDiscountButton.addEventListener('click', removeDiscount);
 
 
 // Topping Modal Event Listeners
