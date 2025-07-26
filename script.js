@@ -994,10 +994,10 @@ function sendWhatsAppConfirmation() {
         message += `\nDescuento: -$${currentDiscountAmount.toFixed(2)}`;
     }
     message += `\nTotal de tu pedido: $${total.toFixed(2)}`;
-    message += `\n\nTu pago será en efectivo? Te llevo cambio? O si prefieres por transferencia a la siguiente CLABE 722968010305501833`;
+    message += `\n\nTu pago será en efectivo? Te llevo cambio? O si prefieres por transferencia a la siguiente CLABE 722969010305501833`;
     message += `\n\n¡Gracias por tu compra! 💖`;
 
-    const whatsappNumber = "5217712794633"; // WhatsApp number for Capibobba
+    const whatsappNumber = "5217711831526"; // WhatsApp number for Capibobba
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
