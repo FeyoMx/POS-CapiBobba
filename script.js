@@ -335,8 +335,9 @@ function initializeData() {
         { id: 'water-maracuya', name: 'Frappé Maracuyá (Agua)', price: 75, type: 'drink' },
         { id: 'water-guanabana', name: 'Frappé Guanábana (Agua)', price: 75, type: 'drink' },
         { id: 'water-sandia', name: 'Frappé Sandía (Agua)', price: 75, type: 'drink' },
-        { id: 'water-tamarindo', name: 'Frappé Tamarindo (Agua)', price: 75, type: 'drink' }, // Nuevo
-        { id: 'milk-pay-de-limon', name: 'Frappé Pay de Limon (Leche)', price: 75, type: 'drink' }, // ¡Nuevo sabor!
+        { id: 'water-tamarindo', name: 'Frappé Tamarindo (Agua)', price: 75, type: 'drink' }, 
+        { id: 'water-cereza', name: 'Frappé Cereza (Agua)', price: 75, type: 'drink' }, 
+        { id: 'water-banana', name: 'Frappé Banana (Agua)', price: 75, type: 'drink' }, 
         // Frappés base leche
         { id: 'milk-choco-mexicano', name: 'Frappé Chocolate Mexicano (Leche)', price: 75, type: 'drink' },
         { id: 'milk-taro', name: 'Frappé Taro (Leche)', price: 75, type: 'drink' },
@@ -346,6 +347,8 @@ function initializeData() {
         { id: 'milk-cookies-cream', name: 'Frappé Cookies & Cream (Leche)', price: 75, type: 'drink' },
         { id: 'milk-crema-irlandesa', name: 'Frappé Crema Irlandesa (Leche)', price: 75, type: 'drink' },
         { id: 'milk-matcha', name: 'Frappé Matcha (Leche)', price: 75, type: 'drink' },
+        { id: 'milk-pay-de-limon', name: 'Frappé Pay de Limon (Leche)', price: 75, type: 'drink' }, 
+        { id: 'milk-algodon-azucar', name: 'Frappé Algodón de Azúcar (Leche)', price: 75, type: 'drink' }, 
         // Bebidas Calientes
         { id: 'hot-chocolate', name: 'Chocolate Caliente', price: 60, type: 'drink' },
         { id: 'hot-taro', name: 'Taro Caliente', price: 60, type: 'drink' },
