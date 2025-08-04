@@ -360,7 +360,8 @@ function initializeData() {
         { id: 'hot-matcha', name: 'Matcha Caliente', price: 60, type: 'drink' },
         // Promociones (tratadas como bebidas por ahora)
         { id: 'promo-fresas-crema', name: 'Frappé Fresas con Crema (Temporada)', price: 75, type: 'drink' },
-        { id: 'promo-chamoyada', name: 'Chamoyada (Temporada)', price: 75, type: 'drink' }, // Nuevo
+        { id: 'promo-chamoyada', name: 'Chamoyada (Temporada)', price: 80, type: 'drink' }, // Nuevo
+        { id: 'promo-yogurtada', name: 'Yogurtada (Temporada)', price: 80, type: 'drink' },
     ];
 
     // Define available toppings separately
