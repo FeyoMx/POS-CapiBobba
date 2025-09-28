@@ -52,6 +52,9 @@ export function initializeData() {
         { id: 'promo-fresas-crema', name: 'Frappé Fresas con Crema (Temporada)', price: 75, type: 'drink' },
         { id: 'promo-chamoyada', name: 'Chamoyada (Temporada)', price: 80, type: 'drink' },
         { id: 'promo-yogurtada', name: 'Yogurtada (Temporada)', price: 80, type: 'drink' },
+        { id: 'promo-pumpkin-latte', name: 'Pumpkin Spice Latte (Temporada)', price: 75, type: 'drink' },
+        { id: 'promo-pumpkin-chai', name: 'Pumpkin Spice Chai (Temporada)', price: 75, type: 'drink' },
+        { id: 'promo-pumpkin-mocha', name: 'Pumpkin Spice Mocha (Temporada)', price: 75, type: 'drink' },
     ];
 
     availableToppings = [
