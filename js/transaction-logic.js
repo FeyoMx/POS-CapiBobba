@@ -1,8 +1,8 @@
 // Transaction Logic module
-// Contains all transaction and sale related functions
+// Contains all transaction and sale related functions with performance optimizations
 
-import { collection, addDoc, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { db, auth, appId } from '../firebase-init.js';
+import { optimizedSalesManager, connectionManager } from './firestore-optimization.js';
 import {
     currentTransaction,
     dailySales,
@@ -261,19 +261,28 @@ export async function completeSale() {
     };
 
     try {
-        const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
+        // Use optimized sales manager with performance monitoring
+        await optimizedSalesManager.measureOperation('Complete Sale', async () => {
+            // Retry operation with connection management
+            return connectionManager.retryOperation(async () => {
+                // Lazy load Firestore modules for performance
+                const { collection, addDoc, doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-        if (editingSaleDocId) {
-            const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
-            await setDoc(saleDocRef, saleData, { merge: false });
-            console.log("Document updated with ID: ", editingSaleDocId);
-            showMessage('Venta Actualizada', `Venta por $${total.toFixed(2)} actualizada con éxito en la base de datos.`);
-            updateEditingSaleDocId(null);
-        } else {
-            const docRef = await addDoc(salesCollectionRef, saleData);
-            console.log("Document written with ID: ", docRef.id);
-            showMessage('Venta Registrada', `Venta por $${total.toFixed(2)} registrada con éxito en la base de datos.`);
-        }
+                const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
+
+                if (editingSaleDocId) {
+                    const saleDocRef = doc(salesCollectionRef, editingSaleDocId);
+                    await setDoc(saleDocRef, saleData, { merge: false });
+                    console.log("Document updated with ID: ", editingSaleDocId);
+                    showMessage('Venta Actualizada', `Venta por $${total.toFixed(2)} actualizada con éxito en la base de datos.`);
+                    updateEditingSaleDocId(null);
+                } else {
+                    const docRef = await addDoc(salesCollectionRef, saleData);
+                    console.log("Document written with ID: ", docRef.id);
+                    showMessage('Venta Registrada', `Venta por $${total.toFixed(2)} registrada con éxito en la base de datos.`);
+                }
+            }, 'Complete Sale');
+        });
 
         updateCurrentTransaction([]);
         updateCurrentDiscountAmount(0);

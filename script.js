@@ -1,7 +1,5 @@
-// Main application script - now modularized
-// Import Firebase modules
-import { collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// Main application script - now modularized with performance optimizations
+// Firebase modules will be loaded lazily when needed
 import { db, auth, appId } from './firebase-init.js';
 
 // Import modularized functionality
@@ -12,6 +10,7 @@ import { completeSale, clearTransaction, applyDiscount, removeDiscount, addCusto
 import { renderReport } from './js/reports.js';
 import { sendWhatsAppConfirmation } from './js/whatsapp.js';
 import { hideMessage, hideConfirm, executeConfirmCallback, showLoginTab, showRegisterTab, showPasswordResetTab, closeAuthModal, openDiscountModal, closeDiscountModal, showMessage } from './js/modals.js';
+import { optimizedSalesManager, enableOfflinePersistence } from './js/firestore-optimization.js';
 import {
     completeSaleButton, clearTransactionButton, whatsappConfirmationButton, modalCloseButton,
     confirmYesButton, confirmNoButton, applyDiscountButton, cancelDiscountButton,
@@ -149,71 +148,99 @@ passwordResetForm.addEventListener('submit', handlePasswordReset);
 forgotPasswordLink.addEventListener('click', handleForgotPasswordClick);
 backToLoginFromResetButton.addEventListener('click', showLoginTab);
 
-// --- Initial Setup ---
+// Lazy load Firebase functions when needed
+async function loadFirebaseModules() {
+    const [
+        { collection, onSnapshot, query, orderBy },
+        { onAuthStateChanged }
+    ] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"),
+        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js")
+    ]);
+
+    return { collection, onSnapshot, query, orderBy, onAuthStateChanged };
+}
+
+// Initialize Firebase listeners after modules are loaded
+async function initializeFirebaseListeners() {
+    try {
+        const { collection, onSnapshot, query, orderBy, onAuthStateChanged } = await loadFirebaseModules();
+
+        // El listener onAuthStateChanged es el punto de entrada principal para la lógica
+        // que depende de la autenticación. Se dispara al cargar la página y cada vez
+        // que el estado de autenticación del usuario cambia (inicio/cierre de sesión).
+        onAuthStateChanged(auth, (user) => {
+            updateAuthUI(user);
+
+            if (user) {
+                // --- Usuario está autenticado ---
+                console.log("Auth state changed: User is logged in.", user.uid);
+
+                // Use optimized sales listener for better performance
+                const unsubscribe = optimizedSalesManager.setupOptimizedListener(
+                    (sales) => {
+                        console.log("Firestore: Ventas diarias actualizadas (optimized).", sales);
+                        updateDailySales(sales);
+
+                        // Re-renderizar la lista de ventas, aplicando el filtro si está activo.
+                        import('./js/data-management.js').then(module => {
+                            if (module.isFilterEnabled) {
+                                applySalesFilter();
+                            } else {
+                                renderDailySales();
+                            }
+                        });
+                    },
+                    (error) => {
+                        console.error("Firestore: Error al obtener ventas diarias:", error);
+                        if (error.code === 'permission-denied') {
+                            showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, inicia sesión con una cuenta válida.');
+                            updateDailySales([]);
+                            renderDailySales();
+                        } else {
+                            showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
+                        }
+                    }
+                );
+
+                updateUnsubscribeFromSales(unsubscribe);
+
+                // Enable offline persistence
+                enableOfflinePersistence().then(enabled => {
+                    if (enabled) {
+                        console.log('[Performance] Offline persistence enabled');
+                    }
+                });
+            } else {
+                // --- No hay usuario autenticado ---
+                console.log("Auth state changed: User is logged out.");
+
+                // Desuscribir el listener de Firestore ya que no hay usuario.
+                import('./js/data-management.js').then(module => {
+                    if (module.unsubscribeFromSales) {
+                        module.unsubscribeFromSales();
+                        updateUnsubscribeFromSales(null);
+                        console.log("Firestore: Listener desuscrito porque no hay usuario autenticado.");
+                    }
+                });
+
+                // Limpiar los datos en memoria y en la UI.
+                updateDailySales([]);
+                renderDailySales();
+            }
+        });
+    } catch (error) {
+        console.error("Error loading Firebase modules:", error);
+        showMessage('Error de Carga', 'Error al cargar los módulos de Firebase. Recarga la página.');
+    }
+}
+
+// Initialize Firebase listeners after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     initializeData();
     renderMenu();
     updateTransactionDisplay();
-});
 
-// El listener onAuthStateChanged es el punto de entrada principal para la lógica
-// que depende de la autenticación. Se dispara al cargar la página y cada vez
-// que el estado de autenticación del usuario cambia (inicio/cierre de sesión).
-onAuthStateChanged(auth, (user) => {
-    updateAuthUI(user);
-
-    if (user) {
-        // --- Usuario está autenticado ---
-        console.log("Auth state changed: User is logged in.", user.uid);
-
-        // Configurar el listener de Firestore para obtener las ventas en tiempo real.
-        const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
-        const q = query(salesCollectionRef, orderBy("timestamp", "desc"));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const dailySales = [];
-            snapshot.forEach((doc) => {
-                dailySales.push({ id: doc.id, ...doc.data() });
-            });
-            console.log("Firestore: Ventas diarias actualizadas.", dailySales);
-
-            updateDailySales(dailySales);
-
-            // Re-renderizar la lista de ventas, aplicando el filtro si está activo.
-            import('./js/data-management.js').then(module => {
-                if (module.isFilterEnabled) {
-                    applySalesFilter();
-                } else {
-                    renderDailySales();
-                }
-            });
-        }, (error) => {
-            console.error("Firestore: Error al obtener ventas diarias:", error);
-            if (error.code === 'permission-denied') {
-                showMessage('Error de Permisos', 'No tienes permisos para cargar las ventas diarias. Por favor, inicia sesión con una cuenta válida.');
-                updateDailySales([]);
-                renderDailySales();
-            } else {
-                showMessage('Error de Sincronización', `No se pudieron cargar las ventas diarias desde la base de datos: ${error.message}.`);
-            }
-        });
-
-        updateUnsubscribeFromSales(unsubscribe);
-    } else {
-        // --- No hay usuario autenticado ---
-        console.log("Auth state changed: User is logged out.");
-
-        // Desuscribir el listener de Firestore ya que no hay usuario.
-        import('./js/data-management.js').then(module => {
-            if (module.unsubscribeFromSales) {
-                module.unsubscribeFromSales();
-                updateUnsubscribeFromSales(null);
-                console.log("Firestore: Listener desuscrito porque no hay usuario autenticado.");
-            }
-        });
-
-        // Limpiar los datos en memoria y en la UI.
-        updateDailySales([]);
-        renderDailySales();
-    }
+    // Load Firebase modules after initial UI is ready
+    initializeFirebaseListeners();
 });
