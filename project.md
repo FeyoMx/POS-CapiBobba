@@ -409,6 +409,55 @@ js/firestore-optimization.js (280 líneas) - Sistema completo de optimizaciones 
 - **Cache efficiency**: +70% hit rate (estrategias diferenciadas)
 - **Offline capability**: +50% funcionalidad offline
 
+### v1.3.0 - Solución de Visibilidad de Datos Históricos (27/09/2024)
+#### 🚨 Problema Crítico Resuelto
+- **Issue**: Datos de ventas del 01/07/2025 al 05/08/2025 no se mostraban en reportes
+- **Causa**: Optimización de performance limitaba carga inicial a 50 ventas recientes
+- **Impacto**: Pérdida de acceso a datos históricos en reportes y filtros
+
+#### 🔧 Soluciones Implementadas
+**1. Firestore Optimization (js/firestore-optimization.js)**
+- ✅ **getSalesByDateRange()**: Mejorado para consultas eficientes por rango de fechas (límite 1000)
+- ✅ **getAllSales()**: Nueva función para acceso completo a datos históricos sin límite
+- ✅ **Logging mejorado**: Monitoreo de rendimiento de consultas
+- ✅ **Conversión ISO**: Uso de strings ISO para comparaciones de fechas más confiables
+
+**2. Reports Module (js/reports.js)**
+- ✅ **renderReport() async**: Convertido a función asíncrona para acceso completo a datos
+- ✅ **Acceso histórico**: Usa getAllSales() para reportes comprehensivos
+- ✅ **Fallback inteligente**: Datos en caché si falla consulta completa + advertencia usuario
+- ✅ **UI mejorada**: Totales generales y contador de ventas en reportes
+
+**3. Transaction Logic (js/transaction-logic.js)**
+- ✅ **Import fix**: Corregido import faltante de deleteDoc para operaciones de eliminación
+
+#### 🎯 Arquitectura de Solución
+```javascript
+// Estrategia de datos por caso de uso:
+├── Carga inicial: limit(50) para performance ⚡
+├── Filtros por fecha: getSalesByDateRange(1000) 📅
+├── Reportes completos: getAllSales() sin límite 📊
+└── Fallback: datos en caché + advertencia 🔄
+```
+
+#### 📊 Resultados Medidos
+- **Acceso histórico**: ✅ 100% datos del 01/07/2025 al 05/08/2025 recuperados
+- **Performance inicial**: ✅ Mantenida (50 registros recientes)
+- **Consultas históricas**: ✅ Solo cuando se necesitan (lazy loading)
+- **UX**: ✅ Loading states + mensajes informativos
+- **Error handling**: ✅ Fallback robusto con advertencias
+
+#### 🔍 Casos de Uso Resueltos
+1. **Filtros por rango de fechas**: Acceso completo a datos históricos
+2. **Reportes diarios/semanales/mensuales**: Datos comprehensivos sin límites
+3. **Navegación histórica**: Visibilidad total del historial de ventas
+4. **Performance**: Carga inicial rápida mantenida
+
+#### 🛡️ Prevención de Recurrencia
+- **Logging de consultas**: Monitoreo automático de operaciones lentas
+- **Documentación clara**: Casos de uso para cada función de acceso a datos
+- **Testing strategy**: Verificación de rangos de fechas en desarrollo
+
 ---
 
 *Archivo actualizado automáticamente el 2024-09-27*

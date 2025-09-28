@@ -329,6 +329,9 @@ export async function deleteSale(saleId) {
     }
 
     try {
+        // Lazy load Firestore modules for performance
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
         const saleDocRef = doc(db, `artifacts/${appId}/public/data/dailySales`, saleId);
         await deleteDoc(saleDocRef);
         console.log("Document successfully deleted with ID: ", saleId);

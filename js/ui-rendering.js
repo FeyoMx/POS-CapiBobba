@@ -188,7 +188,7 @@ export function renderDailySales(salesToRender = dailySales) {
     });
 }
 
-export function applySalesFilter() {
+export async function applySalesFilter() {
     if (!isFilterEnabled) {
         renderDailySales(dailySales);
         return;
@@ -203,26 +203,71 @@ export function applySalesFilter() {
         return;
     }
 
-    let filtered = [...dailySales];
+    // If filtering by date, we need to query Firestore directly to get all data
+    // not just the cached 50 recent sales
+    try {
+        showMessage('Cargando...', 'Buscando ventas en el rango de fechas especificado...');
 
-    if (startDateStr) {
-        const startDate = new Date(startDateStr);
-        startDate.setHours(0, 0, 0, 0);
-        filtered = filtered.filter(sale => new Date(sale.timestamp) >= startDate);
-    }
+        const { optimizedSalesManager } = await import('./firestore-optimization.js');
 
-    if (endDateStr) {
-        const endDate = new Date(endDateStr);
-        endDate.setHours(23, 59, 59, 999);
-        filtered = filtered.filter(sale => new Date(sale.timestamp) <= endDate);
-    }
+        if (startDateStr && endDateStr) {
+            // Query by date range from Firestore directly
+            const startDate = new Date(startDateStr);
+            const endDate = new Date(endDateStr);
+            endDate.setHours(23, 59, 59, 999); // Include the full end date
 
-    if (filtered.length === 0) {
-        showMessage('Sin Resultados', 'No se encontraron ventas para el rango de fechas seleccionado.');
-    } else {
-        showMessage('Filtro Aplicado', `Mostrando ${filtered.length} ventas.`);
+            const filtered = await optimizedSalesManager.getSalesByDateRange(startDate, endDate, 1000); // Increase limit for filtering
+
+            if (filtered.length === 0) {
+                showMessage('Sin Resultados', 'No se encontraron ventas para el rango de fechas seleccionado.');
+            } else {
+                showMessage('Filtro Aplicado', `Mostrando ${filtered.length} ventas del ${startDateStr} al ${endDateStr}.`);
+            }
+            renderDailySales(filtered);
+        } else {
+            // Single date filtering - use local cache but warn about limitations
+            let filtered = [...dailySales];
+
+            if (startDateStr) {
+                const startDate = new Date(startDateStr);
+                startDate.setHours(0, 0, 0, 0);
+                filtered = filtered.filter(sale => new Date(sale.timestamp) >= startDate);
+            }
+
+            if (endDateStr) {
+                const endDate = new Date(endDateStr);
+                endDate.setHours(23, 59, 59, 999);
+                filtered = filtered.filter(sale => new Date(sale.timestamp) <= endDate);
+            }
+
+            if (filtered.length === 0) {
+                showMessage('Sin Resultados', 'No se encontraron ventas para la fecha seleccionada. Nota: Solo se muestran las 50 ventas más recientes. Para ver datos más antiguos, use el filtro de rango de fechas.');
+            } else {
+                showMessage('Filtro Aplicado', `Mostrando ${filtered.length} ventas (limitado a ventas recientes).`);
+            }
+            renderDailySales(filtered);
+        }
+    } catch (error) {
+        console.error('Error applying sales filter:', error);
+        showMessage('Error', 'Error al filtrar ventas. Por favor, intenta de nuevo.');
+
+        // Fallback to local filtering
+        let filtered = [...dailySales];
+
+        if (startDateStr) {
+            const startDate = new Date(startDateStr);
+            startDate.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(sale => new Date(sale.timestamp) >= startDate);
+        }
+
+        if (endDateStr) {
+            const endDate = new Date(endDateStr);
+            endDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(sale => new Date(sale.timestamp) <= endDate);
+        }
+
+        renderDailySales(filtered);
     }
-    renderDailySales(filtered);
 }
 
 export function clearSalesFilter() {

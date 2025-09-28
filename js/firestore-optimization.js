@@ -62,19 +62,20 @@ export class OptimizedSalesManager {
     }
 
     // Get sales by date range with optimized queries
-    async getSalesByDateRange(startDate, endDate, pageSize = 20) {
+    async getSalesByDateRange(startDate, endDate, pageSize = 1000) {
         const { collection, query, where, orderBy, limit, getDocs, Timestamp } = await loadFirestoreModules();
 
         try {
             const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
 
-            const startTimestamp = Timestamp.fromDate(startDate);
-            const endTimestamp = Timestamp.fromDate(endDate);
+            // Convert dates to ISO strings for comparison
+            const startDateString = startDate.toISOString();
+            const endDateString = endDate.toISOString();
 
             const salesQuery = query(
                 salesCollectionRef,
-                where("timestamp", ">=", startTimestamp.toDate().toISOString()),
-                where("timestamp", "<=", endTimestamp.toDate().toISOString()),
+                where("timestamp", ">=", startDateString),
+                where("timestamp", "<=", endDateString),
                 orderBy("timestamp", "desc"),
                 limit(pageSize)
             );
@@ -86,9 +87,38 @@ export class OptimizedSalesManager {
                 sales.push({ id: doc.id, ...doc.data() });
             });
 
+            console.log(`[FirestoreOptimization] Retrieved ${sales.length} sales for date range ${startDateString} to ${endDateString}`);
             return sales;
         } catch (error) {
             console.error("Error getting sales by date range:", error);
+            throw error;
+        }
+    }
+
+    // Get all sales without limit (for comprehensive reports and historical data access)
+    async getAllSales() {
+        const { collection, query, orderBy, getDocs } = await loadFirestoreModules();
+
+        try {
+            const salesCollectionRef = collection(db, `artifacts/${appId}/public/data/dailySales`);
+
+            const salesQuery = query(
+                salesCollectionRef,
+                orderBy("timestamp", "desc")
+                // No limit for comprehensive access
+            );
+
+            const snapshot = await getDocs(salesQuery);
+
+            const sales = [];
+            snapshot.forEach((doc) => {
+                sales.push({ id: doc.id, ...doc.data() });
+            });
+
+            console.log(`[FirestoreOptimization] Retrieved ${sales.length} total sales from database`);
+            return sales;
+        } catch (error) {
+            console.error("Error getting all sales:", error);
             throw error;
         }
     }

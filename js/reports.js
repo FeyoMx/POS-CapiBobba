@@ -3,6 +3,8 @@
 
 import { reportContent } from './dom-elements.js';
 import { dailySales } from './data-management.js';
+import { optimizedSalesManager } from './firestore-optimization.js';
+import { showMessage } from './modals.js';
 
 export function formatDate(date) {
     const d = new Date(date);
@@ -22,9 +24,13 @@ export function getMondayOfWeek(date) {
 }
 
 export function generateDailyReport() {
+    return generateDailyReportFromData(dailySales);
+}
+
+export function generateDailyReportFromData(salesData) {
     const dailyTotals = new Map();
 
-    dailySales.forEach(sale => {
+    salesData.forEach(sale => {
         const saleDate = formatDate(sale.timestamp);
         const currentTotal = dailyTotals.get(saleDate) || 0;
         dailyTotals.set(saleDate, currentTotal + sale.total);
@@ -40,9 +46,13 @@ export function generateDailyReport() {
 }
 
 export function generateWeeklyReport() {
+    return generateWeeklyReportFromData(dailySales);
+}
+
+export function generateWeeklyReportFromData(salesData) {
     const weeklyTotals = new Map();
 
-    dailySales.forEach(sale => {
+    salesData.forEach(sale => {
         const mondayOfWeek = getMondayOfWeek(sale.timestamp);
         const weekKey = formatDate(mondayOfWeek);
         const currentTotal = weeklyTotals.get(weekKey) || 0;
@@ -59,9 +69,13 @@ export function generateWeeklyReport() {
 }
 
 export function generateMonthlyReport() {
+    return generateMonthlyReportFromData(dailySales);
+}
+
+export function generateMonthlyReportFromData(salesData) {
     const monthlyTotals = new Map();
 
-    dailySales.forEach(sale => {
+    salesData.forEach(sale => {
         const d = new Date(sale.timestamp);
         const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const currentTotal = monthlyTotals.get(monthKey) || 0;
@@ -77,42 +91,63 @@ export function generateMonthlyReport() {
     return report;
 }
 
-export function renderReport(reportType) {
-    let reportData = [];
-    let reportTitle = '';
+export async function renderReport(reportType) {
+    try {
+        // Show loading message
+        reportContent.innerHTML = '<p style="text-align: center; color: var(--text-gray);">Cargando informe completo...</p>';
 
-    if (dailySales.length === 0) {
-        reportContent.innerHTML = '<p style="text-align: center; color: var(--text-gray);">No hay ventas registradas para generar informes.</p>';
-        return;
-    }
+        // Get all sales data for comprehensive reports
+        let allSales;
+        try {
+            allSales = await optimizedSalesManager.getAllSales();
+            console.log(`[Reports] Retrieved ${allSales.length} total sales for ${reportType} report`);
+        } catch (error) {
+            console.warn('[Reports] Failed to get all sales, falling back to cached data:', error);
+            allSales = dailySales;
+            showMessage('Datos Limitados', 'Mostrando informe basado en ventas recientes. Para un informe completo, verifica tu conexión.');
+        }
 
-    switch (reportType) {
-        case 'daily':
-            reportData = generateDailyReport();
-            reportTitle = 'Informe de Ventas Diario';
-            break;
-        case 'weekly':
-            reportData = generateWeeklyReport();
-            reportTitle = 'Informe de Ventas Semanal';
-            break;
-        case 'monthly':
-            reportData = generateMonthlyReport();
-            reportTitle = 'Informe de Ventas Mensual';
-            break;
-        default:
-            reportContent.innerHTML = '<p style="text-align: center; color: var(--text-gray);">Selecciona un tipo de informe para ver los resultados.</p>';
+        if (allSales.length === 0) {
+            reportContent.innerHTML = '<p style="text-align: center; color: var(--text-gray);">No hay ventas registradas para generar informes.</p>';
             return;
-    }
+        }
 
-    let reportHtml = `<h3>${reportTitle}</h3>`;
-    if (reportData.length > 0) {
-        reportHtml += '<ul role="list">';
-        reportData.forEach(item => {
-            reportHtml += `<li role="listitem"><span>${item.period}</span><span>$${item.total.toFixed(2)}</span></li>`;
-        });
-        reportHtml += '</ul>';
-    } else {
-        reportHtml += '<p style="text-align: center; color: var(--text-gray);">No hay datos para este informe.</p>';
+        let reportData = [];
+        let reportTitle = '';
+
+        switch (reportType) {
+            case 'daily':
+                reportData = generateDailyReportFromData(allSales);
+                reportTitle = `Informe de Ventas Diario (${allSales.length} ventas)`;
+                break;
+            case 'weekly':
+                reportData = generateWeeklyReportFromData(allSales);
+                reportTitle = `Informe de Ventas Semanal (${allSales.length} ventas)`;
+                break;
+            case 'monthly':
+                reportData = generateMonthlyReportFromData(allSales);
+                reportTitle = `Informe de Ventas Mensual (${allSales.length} ventas)`;
+                break;
+            default:
+                reportContent.innerHTML = '<p style="text-align: center; color: var(--text-gray);">Selecciona un tipo de informe para ver los resultados.</p>';
+                return;
+        }
+
+        let reportHtml = `<h3>${reportTitle}</h3>`;
+        if (reportData.length > 0) {
+            const totalSales = reportData.reduce((sum, item) => sum + item.total, 0);
+            reportHtml += `<p><strong>Total General: $${totalSales.toFixed(2)}</strong></p>`;
+            reportHtml += '<ul role="list">';
+            reportData.forEach(item => {
+                reportHtml += `<li role="listitem"><span>${item.period}</span><span>$${item.total.toFixed(2)}</span></li>`;
+            });
+            reportHtml += '</ul>';
+        } else {
+            reportHtml += '<p style="text-align: center; color: var(--text-gray);">No hay datos para este informe.</p>';
+        }
+        reportContent.innerHTML = reportHtml;
+    } catch (error) {
+        console.error('[Reports] Error generating report:', error);
+        reportContent.innerHTML = '<p style="text-align: center; color: var(--error-color);">Error al generar el informe. Por favor, intenta de nuevo.</p>';
     }
-    reportContent.innerHTML = reportHtml;
 }
