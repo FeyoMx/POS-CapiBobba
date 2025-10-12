@@ -55,6 +55,8 @@ export function initializeData() {
         { id: 'promo-pumpkin-latte', name: 'Pumpkin Spice Latte (Temporada)', price: 75, type: 'drink' },
         { id: 'promo-pumpkin-chai', name: 'Pumpkin Spice Chai (Temporada)', price: 75, type: 'drink' },
         { id: 'promo-pumpkin-mocha', name: 'Pumpkin Spice Mocha (Temporada)', price: 75, type: 'drink' },
+        // Postres y Snacks
+        { id: 'snack-capigofre', name: 'CapiGofre', price: 35, type: 'snack' },
     ];
 
     availableToppings = [
